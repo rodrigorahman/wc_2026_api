@@ -1,0 +1,54 @@
+{
+  "skill_name": "pre-refinement",
+  "evals": [
+    {
+      "id": 1,
+      "name": "ideia-vaga-clareza-baixa",
+      "prompt": "Quero criar um app para controlar minhas etiquetas",
+      "expected_output": "Skill deve identificar clareza BAIXA, NÃO salvar arquivo, e responder com Entendimento Inicial + Ambiguidades + 3-6 Perguntas Prioritárias. Não deve recomendar framework ainda.",
+      "files": [],
+      "expectations": [
+        "A skill NÃO salva o arquivo pre-refinement.md (clareza baixa exige perguntas antes)",
+        "A resposta inclui um 'Entendimento Inicial' em uma frase",
+        "A resposta lista pelo menos 3 perguntas prioritárias e no máximo 6",
+        "As perguntas focam em problema, público, escopo, restrições ou critério de sucesso (não em solução técnica)",
+        "A resposta NÃO recomenda nenhum framework (SDD/miniSpec/TaskCard) ainda",
+        "A resposta NÃO contém código, endpoints, schemas ou arquitetura"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "ideia-clara-taskcard",
+      "prompt": "Adicionar validação de CPF no endpoint POST /users/register. O CPF já é recebido como string no payload, basta validar formato e dígito verificador antes de persistir. Reuso da função existente em pkg/validators/cpf.go.",
+      "expected_output": "Skill deve identificar clareza ALTA, salvar pre-refinement.md, e recomendar TaskCard via Strategy Selector (S1=0-1, S2=só dev, S6=não, S5=<1 dia).",
+      "files": [],
+      "expectations": [
+        "A skill salva um arquivo pre-refinement.md em outputs/",
+        "O arquivo contém uma seção 15 (Strategy Selector) preenchida",
+        "A recomendação é TaskCard (não SDD nem miniSpec)",
+        "A justificativa cita pelo menos 2 sinais decisivos (S1, S2, S3 ou S6)",
+        "A seção 15.3 (Alternativas Consideradas) está preenchida com pelo menos 'por que NÃO miniSpec'",
+        "O comando de próximo passo é /taskcard-generate-taskcard com a ideia entre aspas",
+        "A seção 10 (Aproveitamento de Capacidades Existentes) menciona pkg/validators/cpf.go ou similar",
+        "Toda inferência da skill está marcada com [HIPÓTESE]"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "ideia-clara-sdd-greenfield",
+      "prompt": "Quero criar um backend novo do zero para um sistema de figurinhas da Copa do Mundo. Vai ter cadastro de colecionadores, catálogo de figurinhas, sistema de trocas entre usuários, painel de moderação para denúncias, e integração com app mobile via API REST. Múltiplas personas envolvidas (colecionador, moderador, dev mobile, admin). Tecnologia ainda não decidida.",
+      "expected_output": "Skill deve identificar clareza ALTA, salvar pre-refinement.md, e recomendar SDD via Strategy Selector (S1≥4 OR S2=múltiplas personas OR S6=sim OR S3=greenfield).",
+      "files": [],
+      "expectations": [
+        "A skill salva um arquivo pre-refinement.md em outputs/",
+        "O arquivo contém uma seção 15 (Strategy Selector) preenchida",
+        "A recomendação é SDD (não TaskCard nem miniSpec)",
+        "A justificativa cita pelo menos 2 sinais decisivos entre: S1≥4, S2=múltiplas personas, S3=greenfield, S6=sim",
+        "A seção 15.3 (Alternativas Consideradas) explica por que NÃO miniSpec E por que NÃO TaskCard",
+        "O comando de próximo passo é /sdd-generate-prd com a ideia entre aspas",
+        "A seção 14b (Brainstorm) foi executada (clareza alta + ideia ampla com espaço para compor)",
+        "A skill identifica múltiplas user stories implícitas (cadastro, catálogo, trocas, moderação, integração)"
+      ]
+    }
+  ]
+}
