@@ -1,0 +1,1 @@
+Precisamos implementar o sistema de esqueci a senha para o projeto. A ideia é utilizar o serviço do https://resend.com para enviar a senha para o e-mail cadastrado com uma nova senha cadastrada. No momento do primeiro login faremos a solicitação de troca de senha do usuário
