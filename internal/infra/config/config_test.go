@@ -1,6 +1,8 @@
 package config_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -111,6 +113,35 @@ func TestLoad_ReadsDevelopmentEnv(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, cfg.IsDevelopment(), "APP_ENV=development must enable development mode")
+}
+
+// TestLoad_DefaultsDBPathNextToExecutable verifies that when DB_PATH is unset,
+// the database path defaults to a file in the running executable's directory,
+// so a natively launched binary persists its database next to itself.
+func TestLoad_DefaultsDBPathNextToExecutable(t *testing.T) {
+	t.Setenv("JWT_SECRET", secret32)
+	t.Setenv("DB_PATH", "") // force the default to kick in regardless of ambient env
+
+	cfg, err := config.Load()
+
+	require.NoError(t, err)
+
+	exe, err := os.Executable()
+	require.NoError(t, err)
+	require.Equal(t, filepath.Dir(exe), filepath.Dir(cfg.DBPath), "DB must default to the executable's directory")
+	require.Equal(t, "wc2026.db", filepath.Base(cfg.DBPath))
+}
+
+// TestLoad_RespectsExplicitDBPath verifies that an explicit DB_PATH overrides
+// the executable-directory default.
+func TestLoad_RespectsExplicitDBPath(t *testing.T) {
+	t.Setenv("JWT_SECRET", secret32)
+	t.Setenv("DB_PATH", "/tmp/custom.db")
+
+	cfg, err := config.Load()
+
+	require.NoError(t, err)
+	require.Equal(t, "/tmp/custom.db", cfg.DBPath)
 }
 
 // TestIsDevelopment_TableDriven covers the accepted dev aliases and the

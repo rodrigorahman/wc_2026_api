@@ -10,8 +10,11 @@ docs/specs/.rule-mining/
 *.test
 *.out
 
-# Banco SQLite local (gerado em runtime pelo launcher / make build)
+# Banco SQLite local (gerado em runtime ao lado do executável ou em ./data)
 /data/
+wc2026.db
+wc2026.db-wal
+wc2026.db-shm
 
 # Variáveis de ambiente locais (use .env.example como modelo)
 .env

@@ -5,10 +5,17 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/viper"
 )
+
+// dbFileName is the SQLite file created next to the executable when DB_PATH is
+// not provided, so a natively launched binary persists its database in its own
+// directory regardless of the current working directory.
+const dbFileName = "wc2026.db"
 
 // Config holds all runtime configuration values for the application.
 type Config struct {
@@ -68,11 +75,30 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("JWT_TTL inválido %q: %w", ttlRaw, err)
 	}
 
+	dbPath := v.GetString("DB_PATH")
+	if dbPath == "" {
+		dbPath, err = defaultDBPath()
+		if err != nil {
+			return Config{}, err
+		}
+	}
+
 	return Config{
-		DBPath:    v.GetString("DB_PATH"),
+		DBPath:    dbPath,
 		JWTSecret: secret,
 		JWTTTL:    ttl,
 		GRPCPort:  v.GetString("GRPC_PORT"),
 		Env:       v.GetString("APP_ENV"),
 	}, nil
+}
+
+// defaultDBPath resolves the SQLite file location next to the running
+// executable. The executable's directory always exists, so SQLite can create
+// the file there on first run without any directory setup.
+func defaultDBPath() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("resolver caminho do executável para DB_PATH padrão: %w", err)
+	}
+	return filepath.Join(filepath.Dir(exe), dbFileName), nil
 }
