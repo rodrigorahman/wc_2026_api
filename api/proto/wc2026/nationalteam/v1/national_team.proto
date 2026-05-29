@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package wc2026.nationalteam.v1;
+
+option go_package = "github.com/rodrigorahman/wc_2026_api/gen/wc2026/nationalteam/v1;nationalteamv1";
+
+service NationalTeamService {
+  rpc ListNationalTeams(ListNationalTeamsRequest) returns (ListNationalTeamsResponse);
+}
+
+message ListNationalTeamsRequest {}
+
+message ListNationalTeamsResponse {
+  repeated NationalTeam national_teams = 1;
+}
+
+message NationalTeam {
+  string id = 1;
+  string name = 2;
+  string flag_url = 3;
+}

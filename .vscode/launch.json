@@ -1,0 +1,33 @@
+{
+  // Launcher do WC 2026 API (servidor gRPC em Go).
+  // Requer a extensão "Go" (golang.go) + delve para depuração.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Start server (dev)",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/server",
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "ensure-data-dir",
+      "env": {
+        "APP_ENV": "development",
+        "DB_PATH": "${workspaceFolder}/data/wc2026.db",
+        "JWT_SECRET": "dev-local-jwt-secret-min-32-bytes-long",
+        "JWT_TTL": "1h",
+        "GRPC_PORT": "50051"
+      }
+    },
+    {
+      "name": "Launch server (.env file)",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/server",
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "ensure-data-dir",
+      "envFile": "${workspaceFolder}/.env"
+    }
+  ]
+}

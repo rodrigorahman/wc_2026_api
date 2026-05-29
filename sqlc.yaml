@@ -1,0 +1,12 @@
+version: "2"
+sql:
+  - engine: "sqlite"
+    queries: "internal/infra/db/queries"
+    schema: "internal/infra/db/migrations"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/infra/db/sqlc"
+        overrides:
+          - db_type: "TIMESTAMP"
+            go_type: "time.Time"

@@ -1,0 +1,17 @@
+# Artefatos intermediários do framework agent-spec
+**/.qa_context.md
+**/tasks/.tmp/
+docs/specs/.rule-mining/
+
+# Go
+/bin/
+/server
+**/__debug_bin*
+*.test
+*.out
+
+# Banco SQLite local (gerado em runtime pelo launcher / make build)
+/data/
+
+# Variáveis de ambiente locais (use .env.example como modelo)
+.env

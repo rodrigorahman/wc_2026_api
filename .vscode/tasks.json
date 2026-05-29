@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // Garante o diretório do SQLite antes do launch — o driver abre o arquivo
+      // mas não cria a pasta (DB_PATH=./data/wc2026.db).
+      "label": "ensure-data-dir",
+      "type": "shell",
+      "command": "mkdir -p data",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "silent", "panel": "shared" },
+      "problemMatcher": []
+    }
+  ]
+}
