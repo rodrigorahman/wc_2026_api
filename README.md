@@ -46,7 +46,7 @@ export $(grep -v '^#' .env | xargs)
 
 | Variável | Obrigatória | Default | Descrição |
 |----------|:-----------:|---------|-----------|
-| `DB_PATH` | sim | — | Caminho do arquivo SQLite (ex.: `./data/wc2026.db`) |
+| `DB_PATH` | não | `<dir do executável>/wc2026.db` | Caminho do arquivo SQLite. Quando ausente, o banco é criado na **mesma pasta do executável** (independe do diretório de trabalho). Defina para sobrescrever (ex.: `:memory:` em testes, caminho fixo em container) |
 | `JWT_SECRET` | sim | — | Segredo HS256. **Mínimo 32 bytes** — o servidor **aborta no boot** se ausente/curto |
 | `JWT_TTL` | não | `1h` | Tempo de vida do token (ex.: `1h`, `30m`) |
 | `GRPC_PORT` | não | `50051` | Porta TCP do servidor gRPC |
@@ -58,25 +58,42 @@ export $(grep -v '^#' .env | xargs)
 ## Como rodar
 
 ```bash
-# 1. Garanta o diretório do banco (SQLite cria o arquivo, não o diretório)
-mkdir -p data
-
-# 2. Exporte a configuração (ou use um .env carregado pelo seu shell)
-export DB_PATH=./data/wc2026.db
+# 1. Exporte a configuração (ou use um .env carregado pelo seu shell)
 export JWT_SECRET="$(openssl rand -base64 48)"   # >= 32 bytes
 export GRPC_PORT=50051
+# DB_PATH é opcional: sem ele, o banco nasce ao lado do executável.
+# Em dev com `go run` o binário é efêmero (temp), então defina um caminho fixo:
+export DB_PATH=./data/wc2026.db
 
-# 3. Suba o servidor (migrations + seed de seleções aplicados no boot)
+# 2. Suba o servidor (migrations + seed de seleções aplicados no boot)
 go run ./cmd/server
 ```
+
+> No **binário compilado** (`make build`/`make build-all`) rodando nativamente, omitir `DB_PATH` cria `wc2026.db` na mesma pasta do executável.
 
 No boot o servidor:
 1. Valida a config (fail-fast de `JWT_SECRET`).
 2. Abre o SQLite com os PRAGMAs corretos (`foreign_keys=ON`, `journal_mode=WAL`, `busy_timeout=5000`).
-3. Aplica as migrations embarcadas (cria `selecoes`/`usuarios` e popula o seed de seleções).
+3. Aplica as migrations embarcadas (cria `national_teams`/`users` e popula o seed de seleções).
 4. Monta a cadeia de interceptors e serve gRPC na `GRPC_PORT`.
 
 Encerramento (`Ctrl+C`) faz **graceful shutdown** e fecha o banco.
+
+### Localização do banco de dados
+
+O caminho do arquivo SQLite é resolvido na inicialização nesta ordem:
+
+1. **`DB_PATH` definido** → usa exatamente esse valor (arquivo relativo/absoluto, ou `:memory:` em testes). Tem precedência sobre tudo.
+2. **`DB_PATH` ausente** → usa `wc2026.db` **no mesmo diretório do executável** (`os.Executable()`), independente do diretório de trabalho (CWD) de onde o binário foi chamado.
+
+Implicações práticas:
+
+- **Binário compilado** (`make build` / `make build-all`) rodando nativamente em Windows, Linux ou macOS: sem `DB_PATH`, o banco e seus arquivos WAL (`wc2026.db`, `wc2026.db-wal`, `wc2026.db-shm`) nascem **ao lado do executável**. Não importa de onde você o executou (terminal, duplo-clique, atalho) — o destino é estável.
+- O diretório do executável sempre existe, então **não é necessário criar pasta** nem definir variável para o primeiro run: o SQLite cria o arquivo e as migrations embarcadas aplicam schema + seed automaticamente.
+- **Desenvolvimento com `go run`**: o Go compila para um diretório temporário efêmero, então o default cairia lá (e seria descartado). Em dev, **defina `DB_PATH`** para um caminho fixo (ex.: `./data/wc2026.db`).
+- Para um caminho fixo em produção/container (ex.: volume montado), **defina `DB_PATH`** explicitamente.
+
+> O `.gitignore` ignora `wc2026.db` (e os arquivos `-wal`/`-shm`) além de `./data/`; o banco é um artefato de runtime, nunca versionado.
 
 ---
 
@@ -97,7 +114,7 @@ Todos os targets compilam com `CGO_ENABLED=0` — prova de portabilidade garanti
 make test         # go test ./...  (unit + integração + E2E)
 ```
 
-- **Unitários**: lógica de domínio com mocks (`internal/auth/service`, `internal/auth/token`, ...).
+- **Unitários**: lógica de domínio com mocks (`internal/domain/auth/service`, `internal/domain/auth/token`, ...).
 - **Integração**: contra SQLite real efêmero via `internal/testutil.TestNewDB` (repositórios, migrations, FK/UNIQUE).
 - **E2E**: servidor completo em memória via `bufconn` com a cadeia de interceptors **real** (`test/e2e/`, `internal/testutil.TestNewBufconnServer`).
 
@@ -137,33 +154,35 @@ recovery → logging → protovalidate → auth JWT → handler
 
 ```
 cmd/server/            # composition root (bootstrap fx)
+api/proto/wc2026/      # contratos .proto (versionados por domínio)
+gen/wc2026/            # stubs proto GERADOS (buf) — não editar à mão
 internal/
-  config/              # carga de config (viper) + fail-fast JWT_SECRET
-  logger/              # zap + interceptor de logging
-  clock/               # interface Clock injetável (determinismo de tempo)
-  db/                  # conexão SQLite, migrations, sqlc, fx.Module
-    migrations/        # *.up.sql / *.down.sql (embarcadas)
-    queries/           # *.sql (fonte do sqlc)
-    sqlc/              # código GERADO (não editar à mão)
-  auth/                # domínio de autenticação
-    token/             # TokenManager JWT HS256
-    service/           # AuthService (bcrypt, anti-timing) + interfaces consumidas
-    repository/        # UserRepository (sqlc)
-    handler/           # AuthHandler (mapper proto↔domínio)
-    interceptor/       # protovalidate + auth JWT
-    module.go          # fx.Module do domínio auth
-  nationalteam/        # domínio NationalTeam (módulo de referência read-only)
+  domain/              # features (domínio de negócio)
+    auth/              # domínio de autenticação
+      token/           # TokenManager JWT HS256
+      service/         # AuthService (bcrypt, anti-timing) + interfaces consumidas
+      repository/      # UserRepository (sqlc)
+      handler/         # AuthHandler (mapper proto↔domínio)
+      interceptor/     # protovalidate + auth JWT
+      module.go        # fx.Module do domínio auth
+    nationalteam/      # domínio NationalTeam (módulo de referência read-only)
+  infra/               # infraestrutura técnica (cross-cutting)
+    config/            # carga de config (viper) + fail-fast JWT_SECRET
+    logger/            # zap + interceptor de logging
+    clock/             # interface Clock injetável (determinismo de tempo)
+    db/                # conexão SQLite, migrations, sqlc, fx.Module
+      migrations/      # *.up.sql / *.down.sql (embarcadas)
+      queries/         # *.sql (fonte do sqlc)
+      sqlc/            # código GERADO (não editar à mão)
   server/              # glue: cadeia de interceptors + binds cross-domain
   testutil/            # helpers de teste (TestNewDB, TestNewBufconnServer)
-  pb/                  # stubs proto GERADOS
-proto/wc2026/          # contratos .proto (versionados por domínio)
 test/e2e/              # testes ponta a ponta (bufconn)
 docs/                  # ADRs e specs (SDD)
 ```
 
 ### Convenções-chave
 
-- **Idioma (ADR-0004)**: schema do banco em **pt-BR** (`selecoes`, `usuarios`, `senha_hash`); código Go e contratos proto em **inglês** (`NationalTeam`, `User`, `PasswordHash`). A ponte é o `rename`/`overrides` do `sqlc.yaml` — **nunca** mapeamento manual.
+- **Idioma (ADR-0005, supersede ADR-0004)**: schema do banco, código Go e contratos proto **todos em inglês** (`national_teams`, `users`, `password_hash` → `NationalTeam`, `User`, `PasswordHash`). **Sem bridge de tradução**: o sqlc gera direto do schema (sem bloco `rename` no `sqlc.yaml`; apenas `overrides` de tipo).
 - **Interface no consumidor**: interfaces de dependência são declaradas no pacote que as consome (ex.: `AuthService` declara `UserRepository`); o bind concreto→interface acontece no `fx.Module`.
 - **Sem CGO (ADR-0001)**: sempre o driver `sqlite` (modernc), **nunca** `sqlite3`/mattn.
 - **Erros como `status.Error(codes.X)`**: o service mapeia erro→código gRPC; o handler é mapper puro (não retraduz).
@@ -173,8 +192,8 @@ docs/                  # ADRs e specs (SDD)
 ## Regeneração de código
 
 ```bash
-make proto        # regenera stubs em internal/pb/ a partir de proto/
-make sqlc         # regenera internal/db/sqlc/ a partir de queries/ + migrations/
+make proto        # regenera stubs em gen/ a partir de api/proto/
+make sqlc         # regenera internal/infra/db/sqlc/ a partir de queries/ + migrations/
 ```
 
 Rode após alterar `.proto` ou `.sql`. O código gerado é versionado (não é regenerado no build).

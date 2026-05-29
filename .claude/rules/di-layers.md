@@ -12,7 +12,7 @@ paths:
 
 ## Módulos por domínio
 
-- Wiring vive em `fx.Module` **por domínio** (`internal/<dominio>/module.go`). Um módulo provê seus componentes (repository, service, handler, interceptors) e declara dependências cross-domain que **não** possui.
+- Wiring vive em `fx.Module` **por domínio** (`internal/domain/<dominio>/module.go`). Um módulo provê seus componentes (repository, service, handler, interceptors) e declara dependências cross-domain que **não** possui.
 - O **bind concreto→interface** acontece dentro do `fx.Module` (via `fx.Provide` que retorna o tipo da interface), **nunca** no consumidor.
 - Colisão de tipo no grafo (ex.: dois `grpc.UnaryServerInterceptor`) → desambigue com `fx.ResultTags`/`fx.ParamTags` por nome.
 

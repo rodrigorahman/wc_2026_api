@@ -2,7 +2,7 @@
 description: Convenção de idioma da WC 2026 API — schema do banco, código Go e contratos proto todos em inglês, sem bridge de tradução. Carregada ao editar código Go, proto ou o sqlc.yaml. Materializa a ADR-0005 (que supersedeu a ADR-0004).
 paths:
   - "internal/**"
-  - "proto/**"
+  - "api/proto/**"
   - "sqlc.yaml"
 ---
 

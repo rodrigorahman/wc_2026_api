@@ -1,9 +1,9 @@
 ---
 description: Autenticação e segurança da WC 2026 API — JWT HS256 com defesa alg-confusion, bcrypt cost 12, equalização de timing anti-enumeração, fail-fast de JWT_SECRET, sub via contexto e clock injetável. Carregada ao editar o domínio auth, config ou clock. Materializa a ADR-0003.
 paths:
-  - "internal/auth/**"
-  - "internal/config/**"
-  - "internal/clock/**"
+  - "internal/domain/auth/**"
+  - "internal/infra/config/**"
+  - "internal/infra/clock/**"
   - "internal/server/**"
 ---
 
@@ -33,6 +33,6 @@ paths:
 
 ## Clock determinístico
 
-- Código que depende de tempo recebe `clock.Clock` injetado (`internal/clock`); **não** chame `time.Now()` direto em código testável.
+- Código que depende de tempo recebe `clock.Clock` injetado (`internal/infra/clock`); **não** chame `time.Now()` direto em código testável.
 
 > Cadeia de interceptors e public methods: [`grpc-layers.md`](grpc-layers.md). Como testar auth/clock: [`testing.md`](testing.md).

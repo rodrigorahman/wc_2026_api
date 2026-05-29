@@ -57,7 +57,7 @@ Defina o critério de sucesso. Itere até verificar.
 5. **Auth** — JWT HS256 com `WithValidMethods(["HS256"])` (rejeita alg-confusion), bcrypt cost 12, TTL via config (ADR-0003). Token/senha **nunca** logados.
 6. **Erros** — service retorna `status.Error(codes.X)`; handler é mapper puro (não retraduz). Sentinelas comparados com `errors.Is`, nunca por string.
 7. **Tempo determinístico** — use a interface `clock.Clock` injetada; nunca `time.Now()` direto em código testável.
-8. **Código gerado não se edita** — `internal/pb/**` (buf) e `internal/db/sqlc/**` (sqlc) são regenerados via `make proto` / `make sqlc`.
+8. **Código gerado não se edita** — `gen/**` (buf) e `internal/infra/db/sqlc/**` (sqlc) são regenerados via `make proto` / `make sqlc`.
 
 ---
 

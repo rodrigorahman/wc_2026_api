@@ -1,7 +1,7 @@
 ---
 description: Contratos gRPC e camadas da WC 2026 API — proto versionado + protovalidate, stubs gerados, separação handler/service/repository, ordem da cadeia de interceptors e tratamento de erros com códigos gRPC e sentinelas. Carregada ao editar proto, handlers, services, interceptors ou o servidor.
 paths:
-  - "proto/**"
+  - "api/proto/**"
   - "internal/**/handler/**"
   - "internal/**/service/**"
   - "internal/**/interceptor/**"
@@ -14,9 +14,9 @@ paths:
 
 ## Contratos proto
 
-- Em `proto/wc2026/<dominio>/v1/` com pacote `wc2026.<dominio>.v1`. Campos em inglês.
+- Em `api/proto/wc2026/<dominio>/v1/` com pacote `wc2026.<dominio>.v1`. Campos em inglês.
 - Validação de entrada é **declarativa** via opções `buf.validate.*` (protovalidate — module path `buf.build/go/protovalidate`), não validação manual no handler.
-- Stubs em `internal/pb/wc2026/**` gerados via `make proto`. **Não edite** código gerado.
+- Stubs em `gen/wc2026/**` gerados via `make proto`. **Não edite** código gerado.
 
 ## Camadas por domínio
 
