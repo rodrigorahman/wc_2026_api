@@ -23,7 +23,7 @@ const (
 	seedInglaterraID  = "a1f3c5e7-0006-4000-8000-000000000006"
 	seedCoreiaDoSulID = "a1f3c5e7-0016-4000-8000-000000000016"
 
-	seedNationalTeamCount = 16
+	seedNationalTeamCount = 49 // 16 do seed 000002 + 33 do seed 000008 (Copa 2026)
 )
 
 func newRepo(t *testing.T) *repository.NationalTeamRepository {
@@ -75,8 +75,9 @@ func TestIntegration_FlagURLColumn_ExistsNotNull(t *testing.T) {
 
 // CT-002: a down migration 000005 remove a coluna flag_url (DROP COLUMN
 // suportado pelo driver modernc), exercitada pelo mesmo migrator de produção.
-// Após 000007 (cria matches) e 000006 (que adiciona `code`), reverter até 000005
-// exige três passos: Steps(-3) desfaz 000007, 000006 e em seguida 000005.
+// Após 000008 (seed Copa), 000007 (cria matches) e 000006 (que adiciona `code`),
+// reverter até 000005 exige quatro passos: Steps(-4) desfaz 000008, 000007, 000006
+// e em seguida 000005.
 func TestIntegration_FlagURLColumn_DownRemovesColumn(t *testing.T) {
 	ctx := context.Background()
 
@@ -91,7 +92,7 @@ func TestIntegration_FlagURLColumn_DownRemovesColumn(t *testing.T) {
 		Scan(&beforeDown))
 	require.Equal(t, 1, beforeDown, "flag_url must exist before down")
 
-	require.NoError(t, migrator.Steps(-3))
+	require.NoError(t, migrator.Steps(-4))
 
 	var afterDown int
 	require.NoError(t, db.QueryRowContext(ctx,
@@ -230,8 +231,8 @@ func TestIntegration_Backfill_CodesBySeedID(t *testing.T) {
 
 // CT-T1-003: a down migration 000006 remove a coluna code (DROP COLUMN
 // suportado pelo driver modernc), exercitada pelo mesmo migrator de produção.
-// Após 000007 (cria matches) virar o topo da pilha, reverter até 000006 exige
-// dois passos: Steps(-2) desfaz 000007 e em seguida 000006.
+// Após 000008 (seed Copa) e 000007 (cria matches) virarem o topo da pilha,
+// reverter até 000006 exige três passos: Steps(-3) desfaz 000008, 000007 e em seguida 000006.
 func TestIntegration_CodeColumn_DownRemovesColumn(t *testing.T) {
 	ctx := context.Background()
 
@@ -246,7 +247,7 @@ func TestIntegration_CodeColumn_DownRemovesColumn(t *testing.T) {
 		Scan(&beforeDown))
 	require.Equal(t, 1, beforeDown, "code must exist before down")
 
-	require.NoError(t, migrator.Steps(-2))
+	require.NoError(t, migrator.Steps(-3))
 
 	var afterDown int
 	require.NoError(t, db.QueryRowContext(ctx,

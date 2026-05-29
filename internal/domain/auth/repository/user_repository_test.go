@@ -220,11 +220,11 @@ func TestMigration000004_Down_RevertsTo1to1(t *testing.T) {
 	dsn := t.TempDir() + "/down.db"
 	migrator, db := testutil.NewMigratorForTest(t, dsn)
 
-	// Migrate fully up, then step down past 000007 (create matches), 000006 (add
-	// code), 000005 (add flag_url) and 000004 to assert 000004's down behaviour
-	// (the 1:1 schema revert).
+	// Migrate fully up, then step down past 000008 (seed Copa), 000007 (create
+	// matches), 000006 (add code), 000005 (add flag_url) and 000004 to assert
+	// 000004's down behaviour (the 1:1 schema revert).
 	require.NoError(t, migrator.Up())
-	require.NoError(t, migrator.Steps(-4))
+	require.NoError(t, migrator.Steps(-5))
 
 	// national_team_id is back in users.
 	var hasNationalTeamID int

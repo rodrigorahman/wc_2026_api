@@ -26,8 +26,9 @@ func TestE2E_ListUpcomingMatches_NoToken_Unauthenticated(t *testing.T) {
 	require.Equal(t, codes.Unauthenticated, status.Code(err))
 }
 
-// CT-002 — ListUpcomingMatches com usuário autenticado e sem partidas semeadas
-// retorna lista vazia (não erro), provando que vazio != erro ponta a ponta.
+// CT-002 — ListUpcomingMatches com usuário autenticado cuja única favorita não
+// tem jogos futuros (Itália, cadastrada mas fora da Copa 2026) retorna lista vazia
+// (não erro), provando que vazio != erro ponta a ponta mesmo com o seed de jogos.
 func TestE2E_ListUpcomingMatches_AuthenticatedNoFavorites_Empty(t *testing.T) {
 	ctx := context.Background()
 	conn := testutil.TestNewBufconnServer(t, nil)
@@ -44,7 +45,7 @@ func TestE2E_ListUpcomingMatches_AuthenticatedNoFavorites_Empty(t *testing.T) {
 		FullName:        "Cliente CT002",
 		Email:           email,
 		Password:        password,
-		NationalTeamIds: []string{seededBrasilID},
+		NationalTeamIds: []string{seededItaliaID},
 	})
 	require.NoError(t, err)
 

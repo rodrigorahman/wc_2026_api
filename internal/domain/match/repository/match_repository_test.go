@@ -45,6 +45,7 @@ func TestIntegration_MatchesTable_ColumnsNotNull(t *testing.T) {
 func TestIntegration_Matches_ValidInsert(t *testing.T) {
 	ctx := context.Background()
 	db := testutil.TestNewDB(t)
+	clearMatches(t, ctx, db)
 
 	_, err := db.ExecContext(ctx,
 		"INSERT INTO matches (id, kickoff, home_team_id, away_team_id, stadium, city, stage) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -112,7 +113,7 @@ func TestIntegration_MatchesTable_DownDrops(t *testing.T) {
 		Scan(&beforeDown))
 	require.Equal(t, 1, beforeDown, "matches must exist before down")
 
-	require.NoError(t, migrator.Steps(-1))
+	require.NoError(t, migrator.Steps(-2)) // -2: desfaz 000008 (seed Copa) e 000007 (cria matches)
 
 	var afterDown int
 	require.NoError(t, db.QueryRowContext(ctx,
@@ -178,6 +179,16 @@ func insertTestUser(t *testing.T, ctx context.Context, db *sql.DB) {
 	}
 }
 
+// clearMatches remove os jogos semeados pela migração 000008 (Copa 2026) para
+// que cada teste seja dono das fixtures de partida que insere e asserta contagens
+// em isolamento do seed.
+func clearMatches(t *testing.T, ctx context.Context, db *sql.DB) {
+	t.Helper()
+	if _, err := db.ExecContext(ctx, "DELETE FROM matches"); err != nil {
+		t.Fatalf("clear matches: %v", err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // T3-CT-001: ordenação por kickoff ASC
 // ---------------------------------------------------------------------------
@@ -187,6 +198,7 @@ func insertTestUser(t *testing.T, ctx context.Context, db *sql.DB) {
 func TestIntegration_ListUpcoming_OrdersByKickoffAsc(t *testing.T) {
 	ctx := context.Background()
 	db := testutil.TestNewDB(t)
+	clearMatches(t, ctx, db)
 	repo := repository.NewMatchRepository(sqlc.New(db))
 
 	insertTestUser(t, ctx, db)
@@ -229,6 +241,7 @@ func TestIntegration_ListUpcoming_OrdersByKickoffAsc(t *testing.T) {
 func TestIntegration_ListUpcoming_StrictlyFutureCut(t *testing.T) {
 	ctx := context.Background()
 	db := testutil.TestNewDB(t)
+	clearMatches(t, ctx, db)
 	repo := repository.NewMatchRepository(sqlc.New(db))
 
 	insertTestUser(t, ctx, db)
@@ -265,6 +278,7 @@ func TestIntegration_ListUpcoming_StrictlyFutureCut(t *testing.T) {
 func TestIntegration_ListUpcoming_DedupTwoFavorites(t *testing.T) {
 	ctx := context.Background()
 	db := testutil.TestNewDB(t)
+	clearMatches(t, ctx, db)
 	repo := repository.NewMatchRepository(sqlc.New(db))
 
 	insertTestUser(t, ctx, db)
@@ -316,6 +330,7 @@ func TestIntegration_ListUpcoming_NoFavorites_Empty(t *testing.T) {
 func TestIntegration_ListUpcoming_FavoritesNoFutureGames_Empty(t *testing.T) {
 	ctx := context.Background()
 	db := testutil.TestNewDB(t)
+	clearMatches(t, ctx, db)
 	repo := repository.NewMatchRepository(sqlc.New(db))
 
 	insertTestUser(t, ctx, db)
@@ -347,6 +362,7 @@ func TestIntegration_ListUpcoming_FavoritesNoFutureGames_Empty(t *testing.T) {
 func TestIntegration_ListUpcoming_MapsAllFields(t *testing.T) {
 	ctx := context.Background()
 	db := testutil.TestNewDB(t)
+	clearMatches(t, ctx, db)
 	repo := repository.NewMatchRepository(sqlc.New(db))
 
 	insertTestUser(t, ctx, db)

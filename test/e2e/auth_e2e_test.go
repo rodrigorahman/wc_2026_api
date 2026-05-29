@@ -20,6 +20,9 @@ const (
 	seededBrasilID    = "a1f3c5e7-0001-4000-8000-000000000001"
 	seededArgentinaID = "a1f3c5e7-0002-4000-8000-000000000002"
 	seededFrancaID    = "a1f3c5e7-0003-4000-8000-000000000003"
+	// Itália está no seed 000002 mas não se classificou para a Copa 2026 (seed 000008),
+	// portanto não tem jogos futuros — útil para exercitar o caminho "lista vazia".
+	seededItaliaID = "a1f3c5e7-0009-4000-8000-000000000009"
 )
 
 // CT-056 — a valid Register with one selection over the full stack returns a

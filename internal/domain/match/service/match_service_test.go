@@ -238,6 +238,10 @@ func TestIntegration_ListUpcoming_ClockDrivesCut(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = database.Close() })
 	require.NoError(t, appdb.Migrate(database))
+	// Isola do seed da Copa 2026 (000008): este teste é dono das suas fixtures de jogo.
+	if _, derr := database.ExecContext(ctx, "DELETE FROM matches"); derr != nil {
+		t.Fatalf("clear matches: %v", derr)
+	}
 
 	t0 := time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC)
 
@@ -284,6 +288,10 @@ func TestIntegration_ListUpcoming_ClockDrivesCut(t *testing.T) {
 func TestIntegration_ListUpcoming_ViaTestNewDB(t *testing.T) {
 	ctx := context.Background()
 	database := testutil.TestNewDB(t)
+	// Isola do seed da Copa 2026 (000008): este teste é dono das suas fixtures de jogo.
+	if _, derr := database.ExecContext(ctx, "DELETE FROM matches"); derr != nil {
+		t.Fatalf("clear matches: %v", derr)
+	}
 
 	t0 := time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC)
 

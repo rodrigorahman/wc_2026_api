@@ -25,8 +25,8 @@ func TestE2E_ListNationalTeams_Public(t *testing.T) {
 	teams := resp.GetNationalTeams()
 	require.NotEmpty(t, teams, "seed selections must be returned")
 
-	// The seed (migration 000002) inserts 16 selections.
-	require.Len(t, teams, 16)
+	// Seed 000002 inserts 16 selections; seed 000008 (Copa 2026) adds 33 more (49 total).
+	require.Len(t, teams, 49)
 
 	names := make(map[string]struct{}, len(teams))
 	for _, team := range teams {
@@ -37,7 +37,7 @@ func TestE2E_ListNationalTeams_Public(t *testing.T) {
 	require.Contains(t, names, "Brasil")
 }
 
-// CT-011: end-to-end, ListNationalTeams returns flag_url for the 16 seeded
+// CT-011: end-to-end, ListNationalTeams returns flag_url for the seeded
 // selections, and Brasil carries its exact flag URL.
 func TestE2E_ListNationalTeams_FlagURL(t *testing.T) {
 	ctx := context.Background()
@@ -48,7 +48,7 @@ func TestE2E_ListNationalTeams_FlagURL(t *testing.T) {
 	require.NoError(t, err)
 
 	teams := resp.GetNationalTeams()
-	require.Len(t, teams, 16)
+	require.Len(t, teams, 49)
 
 	var brasilFlagURL string
 	for _, team := range teams {
