@@ -29,10 +29,10 @@ paths:
 
 ## miniSpec — Etapa Opcional: Challenge do Scope
 
-Entre `/minispec-generate-scope` e `/minispec-generate-tasks`, o usuário pode invocar `/challenge-spec` para stress-testar o scope contra código, ADRs e glossário de domínio antes de decompor em tasks.
+Entre `/agent-spec-minispec-generate-scope` e `/agent-spec-minispec-generate-tasks`, o usuário pode invocar `/agent-spec-challenge-spec` para stress-testar o scope contra código, ADRs e glossário de domínio antes de decompor em tasks.
 
-- **Comando**: `/challenge-spec /docs/specs/features/{feature}/{version}/scope.md`
-- **Skill**: `.claude/skills/challenge-spec/SKILL.md`
+- **Comando**: `/agent-spec-challenge-spec /docs/specs/features/{feature}/{version}/scope.md`
+- **Skill**: `.claude/skills/agent-spec-challenge-spec/SKILL.md`
 - **Quando usar**: scopes com decisão técnica não-trivial, terminologia nova ou conflito potencial com código existente.
 - **Quando pular**: scopes pequenos (1-2 endpoints, sem complexidade arquitetural).
-- **Efeito**: pode modificar inline o `scope.md`, criar/atualizar `domain_glossary.global.path` (`/docs/specs/domain-glossary.md`, cross-feature) e/ou `domain_glossary.feature.path` (raiz da feature, compartilhado entre versões), e sugerir ADRs novas (que o usuário cria via `/adr-create`).
+- **Efeito**: pode modificar inline o `scope.md`, criar/atualizar `domain_glossary.global.path` (`/docs/specs/domain-glossary.md`, cross-feature) e/ou `domain_glossary.feature.path` (raiz da feature, compartilhado entre versões), e sugerir ADRs novas (que o usuário cria via `/agent-spec-adr-create`).

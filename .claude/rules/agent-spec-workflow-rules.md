@@ -8,15 +8,15 @@ paths:
   - ".claude/skills/minispec-*/**"
   - ".claude/skills/taskcard-*/**"
   - ".claude/skills/adr-*/**"
-  - ".claude/skills/pre-refinement/**"
-  - ".claude/skills/generate-tech-alignment/**"
-  - ".claude/skills/challenge-spec/**"
-  - ".claude/skills/backend-contract-handoff/**"
+  - ".claude/skills/agent-spec-pre-refinement/**"
+  - ".claude/skills/agent-spec-generate-tech-alignment/**"
+  - ".claude/skills/agent-spec-challenge-spec/**"
+  - ".claude/skills/agent-spec-backend-contract-handoff/**"
 ---
 
 # agent-spec — Regras Comuns dos Workflows
 
-> Carregada automaticamente quando o Claude está operando qualquer workflow do framework agent-spec (SDD, miniSpec, TaskCard, ADR) ou skills compartilhadas (pre-refinement, tech-alignment).
+> Carregada automaticamente quando o Claude está operando qualquer workflow do framework agent-spec (SDD, miniSpec, TaskCard, ADR) ou skills compartilhadas (agent-spec-pre-refinement, tech-alignment).
 > Centraliza Critical Paths, paths compartilhados e convenções. Paths específicos de cada workflow estão em arquivos separados (`agent-spec-sdd-workflow-rules.md`, `agent-spec-minispec-workflow-rules.md`, `agent-spec-taskcard-workflow-rules.md`, `agent-spec-adr-workflow-rules.md`).
 
 ---
@@ -65,7 +65,7 @@ Skills consumidoras leem **os dois**, nesta ordem:
 
 #### Quando criar
 
-Lazy — só quando alguma skill de spec (PRD, Intent, Tech Spec, Scope) ou de challenge (`/challenge-spec`) identificar terminologia que merece registro canônico. Features triviais ou puramente técnicas podem nunca ter glossário-feature, e projetos pequenos podem rodar muito tempo sem glossário-global.
+Lazy — só quando alguma skill de spec (PRD, Intent, Tech Spec, Scope) ou de challenge (`/agent-spec-challenge-spec`) identificar terminologia que merece registro canônico. Features triviais ou puramente técnicas podem nunca ter glossário-feature, e projetos pequenos podem rodar muito tempo sem glossário-global.
 
 #### Estrutura mínima (idêntica para ambos os níveis)
 
@@ -89,10 +89,101 @@ _Evitar_: {alias1}, {alias2}
 #### Quem escreve
 
 - Skills de geração (PRD / Intent / Tech Spec / Scope): **leem** ambos os níveis e validam terminologia contra eles. **Não escrevem** — apenas sinalizam termos novos ao final.
-- Skill `/challenge-spec`: **dona** da criação/atualização. Durante o stress-test, ao canonizar um termo, decide com o usuário se ele vai pro **global** (cross-feature) ou **feature** (local) seguindo o critério acima.
+- Skill `/agent-spec-challenge-spec`: **dona** da criação/atualização. Durante o stress-test, ao canonizar um termo, decide com o usuário se ele vai pro **global** (cross-feature) ou **feature** (local) seguindo o critério acima.
 
 ### Observações de QA / Tech Review
 - **shared.qa_observations.path**: `/docs/specs/features/{feature}/{version}/qa-observations.md`
+
+### Candidatos a Regra (rule mining — append-only durante o run)
+- **shared.rule_candidates.path**: `/docs/specs/features/{feature}/{version}/rule-candidates.md`
+
+> **Para que serve**: log append-only de **sinais** que podem virar regra de projeto. Cada agente do framework (executores via `*-run-tasks`, `agent-spec-qa-validator`, `agent-spec-staff-architecture-review`) emite linhas conforme detecta sinais canônicos durante o run. **Nenhum agente decide se vira regra** — a skill `agent-spec-mine-rule-candidates` consolida sinais de múltiplos runs e entrega clusters para `agent-spec-curate-project-rules` aplicar teste de fricção e definir colocação.
+>
+> **Por que separar de `qa_observations`**: `qa_observations.md` é log de **decisão de pipeline** (retry classification, lote paralelo, gates pulados); é consumido pelo eval de pipeline. `rule-candidates.md` é log de **convenção/decisão repetida**; é consumido pela mineração offline. Misturar polui ambos os consumidores.
+>
+> **Lifecycle**: criado lazy (só na primeira emissão), versionado normalmente (commitado junto com a feature), nunca apagado pelo orquestrador. Mineração lê histórico cross-feature.
+
+#### Vocabulário canônico de sinais
+
+| Sinal | Quem emite | O que captura |
+|---|---|---|
+| `executor_askquestion` | `*-run-tasks` | Executor disparou `AskUserQuestion` (convenção ausente forçou pergunta). |
+| `pre_refinement_decision` | `*-run-tasks` | Decisão registrada na subseção "Decisões já tomadas (fora de negociação)" do agent-spec-pre-refinement (seção 11). |
+| `exemplar_file_read` | `*-run-tasks` | Executor leu arquivo "exemplar" para imitar estilo (convenção não escrita). |
+| `repeated_fixture` | `agent-spec-qa-validator` | Mesma fixture/mock/setup usado em ≥2 testes do run. |
+| `repeated_assertion_shape` | `agent-spec-qa-validator` | Padrão de assert idêntico em ≥3 lugares. |
+| `convention_drift` | `agent-spec-staff-architecture-review` | Finding categoria `convention_drift` (já existe no vocabulário do Tech Review). |
+| `scope_deviation` | `agent-spec-staff-architecture-review` | Finding categoria `scope_deviation`. |
+| `speculative_complexity` | `agent-spec-staff-architecture-review` | Finding categoria `speculative_complexity`. |
+
+> **Vocabulário fechado**: não invente novos sinais. Se um padrão recorrente não cabe em nenhum dos 8, é candidato a expansão do vocabulário — abra discussão antes de emitir.
+
+#### Schema do arquivo
+
+```markdown
+# Rule candidates — {feature}/{version}
+
+> Append-only. Emitido por agentes do framework durante o run. Consumido por `agent-spec-mine-rule-candidates`.
+
+| timestamp (ISO-8601) | source | signal | evidence | context |
+|---|---|---|---|---|
+| 2026-05-29T14:30:00Z | agent-spec-sdd-run-tasks | executor_askquestion | "Devo retornar 404 ou 422 em pedido inexistente?" | T03 / handler de pedido |
+| 2026-05-29T14:35:12Z | agent-spec-qa-validator | repeated_fixture | `shared/fixtures/order_basic.json` em 4 testes | t03_handler_test.go |
+| 2026-05-29T14:40:48Z | staff-review | convention_drift | log com struct vs `zap.Field` inconsistente | `services/payments/processor.go:48` |
+```
+
+**Regras de emissão**:
+- Uma linha por sinal. Nunca consolidar múltiplos sinais numa linha.
+- `evidence`: texto curto + (quando possível) `path:linha` clicável. Sem evidência verificável → não emita.
+- `context`: ID da task + descrição curta do escopo (ex.: `T05 / service de pagamento`).
+- Append puro. Nunca reescrever linhas anteriores.
+
+#### Persistência pelo orquestrador
+
+Os agentes `agent-spec-qa-validator` e `agent-spec-staff-architecture-review` retornam sinais via campo `rule_candidates_emitidos[]` no JSON (não escrevem em arquivo). O orquestrador (`agent-spec-sdd-run-tasks`, `agent-spec-minispec-run-tasks`, `agent-spec-taskcard-run`) é responsável por **traduzir esses sinais em linhas append-only** no `shared.rule_candidates.path`. Além disso, o próprio orquestrador emite 3 sinais que só ele observa.
+
+**Regra de criação lazy do arquivo**: o `rule-candidates.md` só nasce quando o **primeiro sinal qualificado** é emitido no run. Se nada qualifica, **não crie** o arquivo (evita poluir o histórico da feature com arquivos vazios). Ao criar, escreva o cabeçalho:
+
+```markdown
+# Rule candidates — {feature}/{version}
+
+> Append-only. Emitido por agentes do framework durante o run. Consumido por `agent-spec-mine-rule-candidates`.
+
+| timestamp (ISO-8601) | source | signal | evidence | context |
+|---|---|---|---|---|
+```
+
+**Trigger points por orquestrador**:
+
+| Momento | Ação | Sinais resultantes |
+|---|---|---|
+| **Após QA aprovar/rejeitar** (`agent-spec-qa-validator`) | Ler `rule_candidates_emitidos[]` do JSON e **anexar uma linha por item**, com `source: "agent-spec-qa-validator"`. | `repeated_fixture`, `repeated_assertion_shape` |
+| **Após Tech Review aprovar/parcial/rejeitar** (`agent-spec-staff-architecture-review`) | Mesmo procedimento, com `source: "staff-review"`. | `convention_drift`, `scope_deviation`, `speculative_complexity` |
+| **Executor disparou `AskUserQuestion`** durante a execução | Append linha com `source: "{nome-do-orquestrador}"`, `signal: "executor_askquestion"`, `evidence: <pergunta literal>`, `context: <task_id> / <descrição curta>`. | `executor_askquestion` |
+| **Fase 0 do orquestrador, ao carregar agent-spec-pre-refinement** | Se a subseção "Decisões já tomadas (fora de negociação)" do agent-spec-pre-refinement (seção 11) tem itens, append **uma linha por decisão** com `signal: "pre_refinement_decision"`, `evidence: <decisão literal>`, `context: agent-spec-pre-refinement / {feature}`. | `pre_refinement_decision` |
+| **Executor leu arquivo "exemplar"** (declarado em `arquivos_referencia` da task ou explicitamente citado pelo executor como modelo) | Append linha com `signal: "exemplar_file_read"`, `evidence: <path do arquivo lido>`, `context: <task_id> / <descrição curta>`. | `exemplar_file_read` |
+
+**Tradução JSON → linha de tabela**:
+
+Para cada item de `rule_candidates_emitidos[]`:
+
+```
+| {ISO-8601 do momento da emissão} | {source} | {item.signal} | {item.evidence} | {item.context} |
+```
+
+O campo `occurrences[]` do JSON **não vai para a tabela** — fica disponível no JSON original do gate (já persistido pelo pipeline) para a skill `agent-spec-mine-rule-candidates` consultar quando precisar das linhas exatas.
+
+**Deduplicação intra-run**: antes de anexar, o orquestrador grepa o `rule-candidates.md` por `{signal} | {evidence}` (case-insensitive). Se já existe linha idêntica no mesmo run, **pule** (evita duplicar quando QA + Tech Review reportam o mesmo padrão por caminhos diferentes). Deduplicação cross-feature é responsabilidade da `agent-spec-mine-rule-candidates`.
+
+**Falhas não-bloqueantes**: se o append falhar (path inválido, permissão, etc.), registre em `shared.qa_observations.path` como observação e siga. **Nunca** rejeite a task por falha de instrumentação de rule mining.
+
+**Log do orquestrador**: emita uma linha em `shared.qa_observations.path` ao final do run com a contagem total de candidatos persistidos:
+
+```
+[run] rule_candidates: N sinais persistidos em <shared.rule_candidates.path> (qa=X, staff=Y, orquestrador=Z)
+```
+
+Se N == 0, **não** crie o arquivo nem logue (evita ruído).
 
 ### Memória Temporária (lazy — só nasce em rejeição de gate)
 - **shared.temp_memory.dir**: `/docs/specs/features/{feature}/{version}/tasks/.tmp/`
@@ -112,7 +203,7 @@ _Evitar_: {alias1}, {alias2}
 
 ## Critical Paths — Heurística de Áreas Sensíveis
 
-> Usada por `sdd-run-tasks`, `minispec-run-tasks` e `taskcard-run-taskcard` para detectar áreas sensíveis e escalar modelo (executor e gates). **Agnóstica de linguagem/stack** — categorização por **semântica do path**, não por layout específico (Go `internal/`, Java `src/main/`, JS `src/`, Python `app/`, Dart `lib/`).
+> Usada por `agent-spec-sdd-run-tasks`, `agent-spec-minispec-run-tasks` e `agent-spec-taskcard-run` para detectar áreas sensíveis e escalar modelo (executor e gates). **Agnóstica de linguagem/stack** — categorização por **semântica do path**, não por layout específico (Go `internal/`, Java `src/main/`, JS `src/`, Python `app/`, Dart `lib/`).
 
 ### Categorias Canônicas
 
@@ -209,11 +300,11 @@ Ordem de avaliação (primeira que casar vence; ausência → `[qa, tech_review]
 
 ## Tech Review Correction — Classificação `requires_qa_revalidation`
 
-> Usada por `sdd-run-tasks`, `minispec-run-tasks` e `taskcard-run-taskcard` no loop de correção do Tech Review (Gate 2). Decide se a re-rodada após correção precisa **passar pelo QA novamente** (re-validar lógica/comportamento) ou pode **pular o QA e ir direto a um novo Tech Review** (apenas conformidade técnica/code-review). Otimiza tokens e tempo evitando re-QA quando nada mudou no comportamento do código.
+> Usada por `agent-spec-sdd-run-tasks`, `agent-spec-minispec-run-tasks` e `agent-spec-taskcard-run` no loop de correção do Tech Review (Gate 2). Decide se a re-rodada após correção precisa **passar pelo QA novamente** (re-validar lógica/comportamento) ou pode **pular o QA e ir direto a um novo Tech Review** (apenas conformidade técnica/code-review). Otimiza tokens e tempo evitando re-QA quando nada mudou no comportamento do código.
 
 ### Categorias do JSON do Tech Review
 
-O `staff-architecture-review-agent` retorna problemas categorizados (campo `categoria` em cada item de `problemas.criticos[]` / `altos[]` / `medios[]` / `baixos[]`). As categorias relevantes para classificação:
+O `agent-spec-staff-architecture-review` retorna problemas categorizados (campo `categoria` em cada item de `problemas.criticos[]` / `altos[]` / `medios[]` / `baixos[]`). As categorias relevantes para classificação:
 
 | Categoria | Tipo | Justificativa |
 |---|---|---|
@@ -232,6 +323,7 @@ O `staff-architecture-review-agent` retorna problemas categorizados (campo `cate
 | `dead_code` | code_review_only | Remoção de código nunca executado |
 | `imports` | code_review_only | Reorganização/limpeza de imports |
 | `adr_compliance` | **revalidation_required** | Conformidade com ADR pode exigir mudança estrutural — conservador |
+| `speculative_complexity` | **revalidation_required** | Remoção de abstração/feature especulativa altera surface area e pode quebrar usos inadvertidos — conservador |
 
 > **Default conservador**: categoria desconhecida ou ausente → `revalidation_required = true`. Nunca pule QA por dúvida.
 
@@ -287,15 +379,15 @@ Para cada aplicação do algoritmo, o orquestrador DEVE persistir em `shared.qa_
 
 > **Por que log obrigatório**: o post-mortem `cadastro-pratos-franquia` levantou suspeita de que T10 (`naming/style`) foi re-QA indevidamente. Sem log auditável, impossível distinguir bug no algoritmo de execução correta. Com o log, o eval pode validar cada decisão.
 
-### Categorias do `qa-validator` (Gate 1)
+### Categorias do `agent-spec-qa-validator` (Gate 1)
 
-> **Importante**: a tabela de categorias acima descreve o JSON do **Tech Review** (Gate 2). O `qa-validator` (Gate 1) também emite o campo `categoria` em cada `problemas.*[]` usando o **mesmo vocabulário canônico**. Quando o loop de correção é disparado por rejeição do QA (não do Tech Review), aplique o mesmo algoritmo sobre o JSON do QA — Camada 6 (`adr_compliance`), Camada 5 (`tests`, `code_quality`) e Camadas 1-4 (corretude, robustez, segurança superfície, completude) usam as mesmas categorias canônicas.
+> **Importante**: a tabela de categorias acima descreve o JSON do **Tech Review** (Gate 2). O `agent-spec-qa-validator` (Gate 1) também emite o campo `categoria` em cada `problemas.*[]` usando o **mesmo vocabulário canônico**. Quando o loop de correção é disparado por rejeição do QA (não do Tech Review), aplique o mesmo algoritmo sobre o JSON do QA — Camada 6 (`adr_compliance`), Camada 5 (`tests`, `code_quality`) e Camadas 1-4 (corretude, robustez, segurança superfície, completude) usam as mesmas categorias canônicas.
 
 ---
 
 ## Execução Paralela de Tasks (Fase de paralelismo declarado)
 
-> Usada por `sdd-run-tasks` e `minispec-run-tasks` quando o `task_plan.md` marca tasks com `Pode Rodar em Paralelo? = Sim` na mesma fase. **NÃO se aplica a `taskcard-run-taskcard`** — TaskCard é por definição 1 task por vez.
+> Usada por `agent-spec-sdd-run-tasks` e `agent-spec-minispec-run-tasks` quando o `task_plan.md` marca tasks com `Pode Rodar em Paralelo? = Sim` na mesma fase. **NÃO se aplica a `agent-spec-taskcard-run`** — TaskCard é por definição 1 task por vez.
 >
 > **Motivação**: o post-mortem `cadastro-pratos-franquia` declarou T1+T2+T3+T4 paralelos no task_plan, mas o orquestrador ignorava a coluna. Rodaram sequenciais (~40min); em paralelo real seriam ~10min. Economia: ~30min por feature com fase paralela.
 
@@ -322,7 +414,7 @@ Para cada task `ti` do lote:
 2. **Lançamento concorrente**: numa ÚNICA mensagem do orquestrador, despachar todos os `Agent({...})` do executor das tasks do lote em paralelo (multiple tool calls no mesmo turn).
 3. **Aguardar TODOS** os executores retornarem antes de prosseguir.
 4. **Persistir `executor_summary[ti]` em memória** (output enxuto de cada executor) — sem arquivo intermediário. `base_sha` (comum) + `executor_summary[ti]` (por task) viajam inline no prompt dos gates.
-5. **Gates em paralelo POR TASK**: cada `ti` tem seu próprio pipeline `Agent(qa-validator)` → `Agent(staff-architecture-review-agent)` que pode rodar em paralelo com os pipelines de outras tasks do lote.
+5. **Gates em paralelo POR TASK**: cada `ti` tem seu próprio pipeline `Agent(agent-spec-qa-validator)` → `Agent(agent-spec-staff-architecture-review)` que pode rodar em paralelo com os pipelines de outras tasks do lote.
    - **Dentro de uma task**: QA → Tech Review continua **sequencial** (Tech Review precisa do sumário do QA).
    - **Entre tasks**: pipelines isolados → totalmente paralelizáveis.
 6. **Stage real sequencial**: após TODOS os Tech Reviews do lote aprovarem, faça `git add` numa ordem determinística (ID da task ascendente). Razão: garantir que o próximo `base_sha` (capturado para a próxima fase) seja reprodutível.

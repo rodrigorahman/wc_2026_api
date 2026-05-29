@@ -5,15 +5,15 @@ paths:
   - ".claude/skills/minispec-*/**"
   - ".claude/skills/taskcard-*/**"
   - ".claude/skills/adr-*/**"
-  - ".claude/skills/pre-refinement/**"
-  - ".claude/skills/generate-tech-alignment/**"
-  - ".claude/skills/challenge-spec/**"
-  - ".claude/skills/backend-contract-handoff/**"
+  - ".claude/skills/agent-spec-pre-refinement/**"
+  - ".claude/skills/agent-spec-generate-tech-alignment/**"
+  - ".claude/skills/agent-spec-challenge-spec/**"
+  - ".claude/skills/agent-spec-backend-contract-handoff/**"
 ---
 
 # Regras Compartilhadas — Workflows agent-spec
 
-> Carregada automaticamente quando qualquer skill SDD, miniSpec, TaskCard, ADR ou skill auxiliar de spec (pre-refinement, generate-tech-alignment, challenge-spec, backend-contract-handoff) está em execução. Centraliza apenas conteúdo **cross-workflow** (válido em qualquer um deles). Conteúdo específico de cada workflow fica nos respectivos `agent-spec-{workflow}-workflow-rules.md`.
+> Carregada automaticamente quando qualquer skill SDD, miniSpec, TaskCard, ADR ou skill auxiliar de spec (agent-spec-pre-refinement, agent-spec-generate-tech-alignment, agent-spec-challenge-spec, agent-spec-backend-contract-handoff) está em execução. Centraliza apenas conteúdo **cross-workflow** (válido em qualquer um deles). Conteúdo específico de cada workflow fica nos respectivos `agent-spec-{workflow}-workflow-rules.md`.
 
 ---
 

@@ -7,9 +7,9 @@ paths:
 
 # ADR — Paths do Workflow
 
-> Paths **globais** + recursos canônicos. A skill `adr-reindex` é a **dona** do script
-> canônico; a skill `adr-create` é a **dona** do template canônico. Demais skills do
-> domínio ADR (`adr-bootstrap`, `adr-deprecate`, `adr-supersede`) referenciam esses
+> Paths **globais** + recursos canônicos. A skill `agent-spec-adr-reindex` é a **dona** do script
+> canônico; a skill `agent-spec-adr-create` é a **dona** do template canônico. Demais skills do
+> domínio ADR (`agent-spec-adr-bootstrap`, `agent-spec-adr-deprecate`, `agent-spec-adr-supersede`) referenciam esses
 > recursos via `adr.reindex_script` e `adr.template` em vez de manter cópias internas.
 
 ---
@@ -17,14 +17,14 @@ paths:
 - **adr.dir**: `/docs/adr`
 - **adr.index_file**: `/docs/adr/INDEX.md`
 - **adr.file_pattern**: `{id}-{slug}.md`
-- **adr.reindex_script**: `/.claude/skills/adr-reindex/scripts/reindex.cjs`
-- **adr.template**: `/.claude/skills/adr-create/assets/adr-template.md`
+- **adr.reindex_script**: `/.claude/skills/agent-spec-adr-reindex/scripts/reindex.cjs`
+- **adr.template**: `/.claude/skills/agent-spec-adr-create/assets/adr-template.md`
 
 ---
 
 # ADR — Critérios Canônicos de Criação (Fonte Única)
 
-> Esta seção é a **fonte única de verdade** sobre quando criar uma ADR. Skills de detecção (`sdd-generate-tech-spec`, `minispec-generate-scope`) e a skill de criação (`adr-create`) **referenciam** estes critérios em vez de duplicá-los. Toda nova ADR DEVE satisfazer **TODOS os 5 critérios**.
+> Esta seção é a **fonte única de verdade** sobre quando criar uma ADR. Skills de detecção (`agent-spec-sdd-generate-tech-spec`, `agent-spec-minispec-generate-scope`) e a skill de criação (`agent-spec-adr-create`) **referenciam** estes critérios em vez de duplicá-los. Toda nova ADR DEVE satisfazer **TODOS os 5 critérios**.
 
 ## Os 5 Critérios (require_all)
 
@@ -50,17 +50,17 @@ error-handling, cross-cutting
 
 ## Heurística de Aplicação
 
-### Em skills de detecção (`sdd-generate-tech-spec`, `minispec-generate-scope`)
+### Em skills de detecção (`agent-spec-sdd-generate-tech-spec`, `agent-spec-minispec-generate-scope`)
 
 1. Ao identificar uma decisão técnica candidata, aplique os 5 critérios mentalmente.
 2. Se **todos** baterem → registre na seção de Observações do artefato como **"Candidato a ADR confirmado"** + tag aplicável + 1 frase justificando cada critério.
 3. Se **2-4** baterem → registre como **"Candidato a ADR parcial"** + lista de critérios que falharam (ajuda o usuário a decidir se promove ou refina).
 4. Se **0-1** baterem → registre apenas como decisão técnica na seção apropriada — **não** mencione candidatura a ADR.
-5. **NUNCA** crie ADR automaticamente — apenas sinalize. O usuário invoca `/adr-create` se desejar.
+5. **NUNCA** crie ADR automaticamente — apenas sinalize. O usuário invoca `/agent-spec-adr-create` se desejar.
 
-### Em `adr-create` (gate de criação)
+### Em `agent-spec-adr-create` (gate de criação)
 
-A skill `adr-create` deve **revalidar os 5 critérios** com o usuário (via `AskUserQuestion`) antes de coletar dados. Se qualquer critério falhar, encerra orientando o usuário a documentar a decisão no Tech Spec / Scope apropriado.
+A skill `agent-spec-adr-create` deve **revalidar os 5 critérios** com o usuário (via `AskUserQuestion`) antes de coletar dados. Se qualquer critério falhar, encerra orientando o usuário a documentar a decisão no Tech Spec / Scope apropriado.
 
 ## Por que 5 critérios (e não menos)
 

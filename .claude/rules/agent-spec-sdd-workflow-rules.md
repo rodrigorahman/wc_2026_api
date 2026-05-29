@@ -29,10 +29,10 @@ paths:
 
 ## SDD — Etapa Opcional: Challenge da Tech Spec
 
-Entre `/sdd-generate-tech-spec` e `/sdd-generate-task-plan`, o usuário pode invocar `/challenge-spec` para stress-testar a tech spec contra código, ADRs e glossário de domínio antes de decompor em tasks.
+Entre `/agent-spec-sdd-generate-tech-spec` e `/agent-spec-sdd-generate-task-plan`, o usuário pode invocar `/agent-spec-challenge-spec` para stress-testar a tech spec contra código, ADRs e glossário de domínio antes de decompor em tasks.
 
-- **Comando**: `/challenge-spec /docs/specs/features/{feature}/{version}/tech_spec.md`
-- **Skill**: `.claude/skills/challenge-spec/SKILL.md`
+- **Comando**: `/agent-spec-challenge-spec /docs/specs/features/{feature}/{version}/tech_spec.md`
+- **Skill**: `.claude/skills/agent-spec-challenge-spec/SKILL.md`
 - **Quando usar**: features com risco arquitetural relevante (toca critical_paths, decisões com trade-off real, novos domínios).
 - **Quando pular**: features triviais, ajustes pontuais, specs já revisadas manualmente com profundidade.
-- **Efeito**: pode modificar inline o `tech_spec.md`, criar/atualizar `domain_glossary.global.path` (`/docs/specs/domain-glossary.md`, cross-feature) e/ou `domain_glossary.feature.path` (raiz da feature, compartilhado entre versões), e sugerir ADRs novas (que o usuário cria via `/adr-create`).
+- **Efeito**: pode modificar inline o `tech_spec.md`, criar/atualizar `domain_glossary.global.path` (`/docs/specs/domain-glossary.md`, cross-feature) e/ou `domain_glossary.feature.path` (raiz da feature, compartilhado entre versões), e sugerir ADRs novas (que o usuário cria via `/agent-spec-adr-create`).

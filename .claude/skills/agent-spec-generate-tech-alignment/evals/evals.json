@@ -1,0 +1,66 @@
+{
+  "skill_name": "agent-spec-generate-tech-alignment",
+  "evals": [
+    {
+      "id": 1,
+      "name": "sem-descricao-tecnica-propoe-do-zero",
+      "prompt": "/docs/specs/features/cardapio-digital/v1/prd.md",
+      "expected_output": "Apenas o PRD foi passado (sem descrição técnica). A skill deve detectar SDD, ancorar no projeto (stack/ADRs), e na Fase 1 apresentar um esqueleto de 3-5 pontos de decisão técnica, pausando antes de expandir. NÃO deve apenas reescrever — deve propor caminhos do zero.",
+      "files": [],
+      "expectations": [
+        "A skill detecta o framework SDD pelo nome prd.md",
+        "A skill funciona mesmo SEM o 2º argumento (descrição técnica é opcional)",
+        "A resposta apresenta um ESQUELETO com 3-5 pontos de decisão técnica (Fase 1)",
+        "Os pontos são decisões arquiteturais ortogonais (ex.: persistência, sincronismo, auth, contrato), não detalhes de implementação",
+        "A skill pausa e pergunta quais pontos discutir antes de expandir (não avança sozinha para a Fase 2)",
+        "A skill NÃO desenha endpoints, schemas, tabelas ou nomes de arquivo",
+        "A skill NÃO inicia automaticamente o TECH_SPEC"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "fase2-alternativas-viaveis-com-tradeoffs",
+      "prompt": "/docs/specs/features/sync-impressoras/v1/intent.md preciso de um cache local das impressoras pareadas para funcionar offline",
+      "expected_output": "miniSpec detectado. A descrição técnica (arg2) entra como UMA das alternativas, não a única. Na Fase 2, para o ponto 'persistência do cache local', a skill propõe 2-3 alternativas viáveis ancoradas no stack, cada uma com exemplo e trade-off, e dá uma recomendação.",
+      "files": [],
+      "expectations": [
+        "A skill detecta miniSpec pelo nome intent.md",
+        "A descrição técnica do usuário é tratada como uma alternativa candidata, não como a única solução",
+        "Para o ponto de decisão de persistência, a skill apresenta 2-3 alternativas viáveis (ex.: SQLite, in-memory com TTL, reuso de store existente)",
+        "Cada alternativa tem exemplo concreto + prós/contras + nota de viabilidade ancorada no projeto",
+        "A skill dá uma recomendação explícita com justificativa antes de perguntar",
+        "A skill se mantém em alto nível (sem DDL de tabela, sem nomes de coluna)"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "registro-de-decisoes-e-fronteira-adr",
+      "prompt": "/docs/specs/features/auth-oauth2/v1/prd.md quero padronizar autenticação via OAuth2 com tokens JWT para toda a plataforma",
+      "expected_output": "Após convergir, a skill salva o tech-alignment.md com o registro de decisões (escolhida + rejeitadas + justificativa + trade-off). Como a decisão de auth é transversal/evergreen, marca como candidata a ADR e recomenda /agent-spec-adr-create — sem criar a ADR diretamente.",
+      "files": [],
+      "expectations": [
+        "A skill salva um arquivo tech-alignment.md no path resolvido via tech_alignment.path",
+        "O arquivo contém a seção 4 (Registro de Decisões) com pelo menos uma decisão no formato: alternativas avaliadas + decisão + rejeitadas + trade-off aceito",
+        "A decisão de auth transversal é marcada como candidata a ADR (seção 5)",
+        "A skill recomenda /agent-spec-adr-create para a decisão transversal e NÃO cria a ADR diretamente",
+        "A skill consulta ADRs ativas (docs/adr/INDEX.md) durante a ancoragem",
+        "A skill NÃO inicia automaticamente o TECH_SPEC nem sugere o próximo comando do framework (exceto /agent-spec-adr-create)",
+        "O arquivo se mantém em alto nível (sem endpoints, sem schema de token, sem nomes de tabela)"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "conflito-com-stack-vira-ponto-de-discussao",
+      "prompt": "/docs/specs/features/relatorios/v1/intent.md vou usar MongoDB para guardar os relatórios",
+      "expected_output": "Se o projeto já usa um banco relacional/Redis e não tem Mongo, a skill NÃO descarta nem aceita cegamente — transforma em ponto de decisão e apresenta alternativas (seguir o padrão existente vs. introduzir Mongo) com trade-offs e marca a tecnologia nova como hipótese a validar.",
+      "files": [],
+      "expectations": [
+        "A skill faz a ancoragem no projeto antes de propor (lê CLAUDE.md/rules e detecta a persistência atual)",
+        "Ao detectar que MongoDB não faz parte do stack, a skill levanta o conflito como ponto de decisão (não aceita cegamente nem descarta)",
+        "A skill apresenta a alternativa de reusar a persistência existente com trade-offs frente ao Mongo",
+        "A introdução de tecnologia nova (Mongo) é marcada como [HIPÓTESE] / requer validação",
+        "A skill mantém a proposta em alto nível, sem desenhar coleções/índices/schema"
+      ]
+    }
+  ]
+}

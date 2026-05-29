@@ -1,0 +1,19 @@
+{
+  "skill_name": "agent-spec-adr-bootstrap",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "projeto-go-decisoes-obvias",
+      "prompt": "Faça o bootstrap inicial de ADRs para o projeto em /Volumes/Dev/pocs/workflow-migration/.claude/skills/adr-bootstrap-workspace/fixtures/proj-go-pedidos. Liste os candidatos a ADR identificados (com título proposto e tag canônica) e proponha o conteúdo Nygard de 1 das ADRs mais importantes. NÃO peça confirmação humana — gere o resultado escrito direto.",
+      "expected_output": "Lista de 4-7 candidatos a ADR cobrindo decisões transversais óbvias (Hexagonal Architecture, Postgres+pgx, Gin, JWT RS256, NATS JetStream, testcontainers, OTel) com tags canônicas; Nygard completo da decisão escolhida.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "eval_name": "projeto-cli-sem-decisoes",
+      "prompt": "Faça o bootstrap inicial de ADRs para o projeto em /Volumes/Dev/pocs/workflow-migration/.claude/skills/adr-bootstrap-workspace/fixtures/proj-cli-trivial. Liste os candidatos a ADR identificados.",
+      "expected_output": "Reconhecer que o projeto NÃO possui decisões transversais com custo de reversão suficiente para virar ADR. Resultado esperado: 0 candidatos, com justificativa clara de que as 3 heurísticas (transversal + tag-alvo + custo-reversão) não são satisfeitas.",
+      "files": []
+    }
+  ]
+}
