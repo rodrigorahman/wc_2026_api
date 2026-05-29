@@ -16,6 +16,7 @@ import (
 	"github.com/rodrigorahman/wc_2026_api/internal/domain/auth"
 	"github.com/rodrigorahman/wc_2026_api/internal/domain/auth/service"
 	"github.com/rodrigorahman/wc_2026_api/internal/domain/auth/token"
+	"github.com/rodrigorahman/wc_2026_api/internal/domain/match"
 	"github.com/rodrigorahman/wc_2026_api/internal/infra/clock"
 	"github.com/rodrigorahman/wc_2026_api/internal/infra/config"
 	"github.com/rodrigorahman/wc_2026_api/internal/infra/db"
@@ -230,6 +231,7 @@ func TestIntegration_FxWiring_Smoke(t *testing.T) {
 		db.Module,
 		auth.Module,
 		nationalteam.Module,
+		match.Module,
 		server.Providers,
 		fx.Supply(cfg),
 		fx.Invoke(func(*grpc.Server) {}),

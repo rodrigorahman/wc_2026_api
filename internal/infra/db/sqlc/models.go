@@ -8,10 +8,21 @@ import (
 	"time"
 )
 
+type Match struct {
+	ID         string
+	Kickoff    time.Time
+	HomeTeamID string
+	AwayTeamID string
+	Stadium    string
+	City       string
+	Stage      string
+}
+
 type NationalTeam struct {
 	ID      string
 	Name    string
 	FlagUrl string
+	Code    string
 }
 
 type User struct {

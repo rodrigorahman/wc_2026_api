@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package wc2026.match.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/rodrigorahman/wc_2026_api/gen/wc2026/match/v1;matchv1";
+
+service MatchService {
+  rpc ListUpcomingMatches(ListUpcomingMatchesRequest) returns (ListUpcomingMatchesResponse);
+}
+
+message ListUpcomingMatchesRequest {}
+
+message ListUpcomingMatchesResponse {
+  repeated Match matches = 1;
+}
+
+message Match {
+  string id = 1;
+  google.protobuf.Timestamp kickoff = 2;
+  MatchTeam home_team = 3;
+  MatchTeam away_team = 4;
+  string stadium = 5;
+  string city = 6;
+  string stage = 7;
+}
+
+message MatchTeam {
+  string id = 1;
+  string name = 2;
+  string flag_url = 3;
+  string code = 4;
+}

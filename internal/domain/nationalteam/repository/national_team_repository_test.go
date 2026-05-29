@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/rodrigorahman/wc_2026_api/internal/infra/db/sqlc"
 	"github.com/rodrigorahman/wc_2026_api/internal/domain/nationalteam/repository"
+	"github.com/rodrigorahman/wc_2026_api/internal/infra/db/sqlc"
 	"github.com/rodrigorahman/wc_2026_api/internal/testutil"
 )
 
@@ -19,6 +19,9 @@ const (
 	seedBrasilID      = "a1f3c5e7-0001-4000-8000-000000000001"
 	seedBrasilName    = "Brasil"
 	seedBrasilFlagURL = "https://flagcdn.com/w320/br.png"
+
+	seedInglaterraID  = "a1f3c5e7-0006-4000-8000-000000000006"
+	seedCoreiaDoSulID = "a1f3c5e7-0016-4000-8000-000000000016"
 
 	seedNationalTeamCount = 16
 )
@@ -72,6 +75,8 @@ func TestIntegration_FlagURLColumn_ExistsNotNull(t *testing.T) {
 
 // CT-002: a down migration 000005 remove a coluna flag_url (DROP COLUMN
 // suportado pelo driver modernc), exercitada pelo mesmo migrator de produção.
+// Após 000007 (cria matches) e 000006 (que adiciona `code`), reverter até 000005
+// exige três passos: Steps(-3) desfaz 000007, 000006 e em seguida 000005.
 func TestIntegration_FlagURLColumn_DownRemovesColumn(t *testing.T) {
 	ctx := context.Background()
 
@@ -86,7 +91,7 @@ func TestIntegration_FlagURLColumn_DownRemovesColumn(t *testing.T) {
 		Scan(&beforeDown))
 	require.Equal(t, 1, beforeDown, "flag_url must exist before down")
 
-	require.NoError(t, migrator.Steps(-1))
+	require.NoError(t, migrator.Steps(-3))
 
 	var afterDown int
 	require.NoError(t, db.QueryRowContext(ctx,
@@ -179,6 +184,88 @@ func TestIntegration_GetNationalTeamByID_Seed(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, seedBrasilName, name)
+}
+
+// CT-T1-001: a coluna code existe em national_teams com NOT NULL após as
+// migrations (PRAGMA table_info).
+func TestIntegration_CodeColumn_ExistsNotNull(t *testing.T) {
+	ctx := context.Background()
+	db := testutil.TestNewDB(t)
+
+	var name string
+	var notNull int
+	err := db.QueryRowContext(ctx,
+		"SELECT name, \"notnull\" FROM pragma_table_info('national_teams') WHERE name = 'code'").
+		Scan(&name, &notNull)
+
+	require.NoError(t, err, "code column must exist in national_teams")
+	require.Equal(t, "code", name)
+	require.Equal(t, 1, notNull, "code must be NOT NULL")
+}
+
+// CT-T1-002: as 16 seleções do seed têm a sigla FIFA backfillada pela migração
+// 000006, conferindo os códigos sensíveis (Brasil=BRA, Inglaterra=ENG, Coreia
+// do Sul=KOR).
+func TestIntegration_Backfill_CodesBySeedID(t *testing.T) {
+	ctx := context.Background()
+	db := testutil.TestNewDB(t)
+
+	rows, err := db.QueryContext(ctx, "SELECT id, code FROM national_teams")
+	require.NoError(t, err)
+	defer rows.Close()
+
+	byID := make(map[string]string, seedNationalTeamCount)
+	for rows.Next() {
+		var id, code string
+		require.NoError(t, rows.Scan(&id, &code))
+		byID[id] = code
+	}
+	require.NoError(t, rows.Err())
+	require.Len(t, byID, seedNationalTeamCount)
+
+	require.Equal(t, "BRA", byID[seedBrasilID], "Brasil")
+	require.Equal(t, "ENG", byID[seedInglaterraID], "Inglaterra")
+	require.Equal(t, "KOR", byID[seedCoreiaDoSulID], "Coreia do Sul")
+}
+
+// CT-T1-003: a down migration 000006 remove a coluna code (DROP COLUMN
+// suportado pelo driver modernc), exercitada pelo mesmo migrator de produção.
+// Após 000007 (cria matches) virar o topo da pilha, reverter até 000006 exige
+// dois passos: Steps(-2) desfaz 000007 e em seguida 000006.
+func TestIntegration_CodeColumn_DownRemovesColumn(t *testing.T) {
+	ctx := context.Background()
+
+	dsn := filepath.Join(t.TempDir(), "down006.db")
+	migrator, db := testutil.NewMigratorForTest(t, dsn)
+
+	require.NoError(t, migrator.Up())
+
+	var beforeDown int
+	require.NoError(t, db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM pragma_table_info('national_teams') WHERE name = 'code'").
+		Scan(&beforeDown))
+	require.Equal(t, 1, beforeDown, "code must exist before down")
+
+	require.NoError(t, migrator.Steps(-2))
+
+	var afterDown int
+	require.NoError(t, db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM pragma_table_info('national_teams') WHERE name = 'code'").
+		Scan(&afterDown))
+	require.Equal(t, 0, afterDown, "code must be dropped after down")
+}
+
+// CT-T1-004: companion negativo de CT-T1-002 — nenhuma seleção fica com code
+// vazio após o backfill.
+func TestIntegration_Backfill_NoEmptyCode(t *testing.T) {
+	ctx := context.Background()
+	db := testutil.TestNewDB(t)
+
+	var emptyCount int
+	require.NoError(t, db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM national_teams WHERE code = ''").
+		Scan(&emptyCount))
+	require.Equal(t, 0, emptyCount, "no selection may have an empty code after backfill")
 }
 
 // CT-025: id inexistente — not-found tratável via errors.Is.

@@ -29,9 +29,11 @@ import (
 	authservice "github.com/rodrigorahman/wc_2026_api/internal/domain/auth/service"
 	"github.com/rodrigorahman/wc_2026_api/internal/infra/config"
 	applogger "github.com/rodrigorahman/wc_2026_api/internal/infra/logger"
+	matchhandler "github.com/rodrigorahman/wc_2026_api/internal/domain/match/handler"
 	nthandler "github.com/rodrigorahman/wc_2026_api/internal/domain/nationalteam/handler"
 	ntrepo "github.com/rodrigorahman/wc_2026_api/internal/domain/nationalteam/repository"
 	authv1 "github.com/rodrigorahman/wc_2026_api/gen/wc2026/auth/v1"
+	matchv1 "github.com/rodrigorahman/wc_2026_api/gen/wc2026/match/v1"
 	nationalteamv1 "github.com/rodrigorahman/wc_2026_api/gen/wc2026/nationalteam/v1"
 )
 
@@ -128,6 +130,7 @@ func newGRPCServer(
 	logger *zap.Logger,
 	authSrv *authhandler.AuthHandler,
 	ntSrv *nthandler.NationalTeamHandler,
+	matchSrv *matchhandler.MatchHandler,
 	cfg config.Config,
 ) *grpc.Server {
 	recoveryInterceptor := recovery.UnaryServerInterceptor(
@@ -147,6 +150,7 @@ func newGRPCServer(
 
 	authv1.RegisterAuthServiceServer(srv, authSrv)
 	nationalteamv1.RegisterNationalTeamServiceServer(srv, ntSrv)
+	matchv1.RegisterMatchServiceServer(srv, matchSrv)
 
 	if cfg.IsDevelopment() {
 		reflection.Register(srv)

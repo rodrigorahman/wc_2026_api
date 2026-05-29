@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/rodrigorahman/wc_2026_api/internal/domain/auth"
+	"github.com/rodrigorahman/wc_2026_api/internal/domain/match"
 	"github.com/rodrigorahman/wc_2026_api/internal/infra/clock"
 	"github.com/rodrigorahman/wc_2026_api/internal/infra/config"
 	"github.com/rodrigorahman/wc_2026_api/internal/infra/db"
@@ -72,6 +73,7 @@ func TestNewBufconnServer(t *testing.T, clk clock.Clock) *grpc.ClientConn {
 		db.Module,
 		auth.Module,
 		nationalteam.Module,
+		match.Module,
 		server.Providers,
 		// Supply a fixed config (no env / viper needed) and the bufconn listener.
 		fx.Supply(testCfg),

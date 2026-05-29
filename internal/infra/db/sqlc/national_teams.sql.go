@@ -10,7 +10,7 @@ import (
 )
 
 const getNationalTeamByID = `-- name: GetNationalTeamByID :one
-SELECT id, name, flag_url
+SELECT id, name, flag_url, code
 FROM national_teams
 WHERE id = ?
 `
@@ -18,12 +18,17 @@ WHERE id = ?
 func (q *Queries) GetNationalTeamByID(ctx context.Context, id string) (NationalTeam, error) {
 	row := q.db.QueryRowContext(ctx, getNationalTeamByID, id)
 	var i NationalTeam
-	err := row.Scan(&i.ID, &i.Name, &i.FlagUrl)
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.FlagUrl,
+		&i.Code,
+	)
 	return i, err
 }
 
 const listNationalTeams = `-- name: ListNationalTeams :many
-SELECT id, name, flag_url
+SELECT id, name, flag_url, code
 FROM national_teams
 ORDER BY name
 `
@@ -37,7 +42,12 @@ func (q *Queries) ListNationalTeams(ctx context.Context) ([]NationalTeam, error)
 	var items []NationalTeam
 	for rows.Next() {
 		var i NationalTeam
-		if err := rows.Scan(&i.ID, &i.Name, &i.FlagUrl); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.FlagUrl,
+			&i.Code,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
