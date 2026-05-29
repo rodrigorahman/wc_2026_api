@@ -1,7 +1,7 @@
 feature: "proximos-jogos-selecoes"
 source: "recommended"
 source_note: ""
-current_step: task_plan
+current_step: execution
 variant: backend
 steps:
   intent:
@@ -17,6 +17,7 @@ steps:
     status: completed
     summary: "7 tasks, 4 fases, 0 paralelizáveis (pipeline sequencial: caminho crítico é a cadeia de persistência)."
   execution:
-    status: pending
+    status: completed
     tasks_total: 7
-    tasks_completed: 0
+    tasks_completed: 7
+    summary: "7/7 tasks concluídas. T2/T3/T5 exigiram 1 ciclo de correção cada (desvio de escopo em produção / assertions fracas / segurança de seam de auth). 0 tasks bloqueadas."

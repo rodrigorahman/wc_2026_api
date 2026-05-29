@@ -7,7 +7,7 @@
 - **Scope**: `docs/specs/features/proximos-jogos-selecoes/v1/scope.md`
 - **Responsavel**: Rodrigo Rahman
 - **Data**: 2026-05-29
-- **Status**: Rascunho
+- **Status**: Concluído
 
 ---
 
@@ -35,13 +35,13 @@ Entregar o domínio de leitura `match` (handler→service→repository + `fx.Mod
 ## 4. Lista de Tasks (visao macro)
 | ID | Nome da Task | Arquivo | Fase | Dependencias | Pode Rodar em Paralelo? | Status |
 |----|-------------|---------|------|-------------|------------------------|--------|
-| T1 | Migração 000006 — coluna `code` + backfill das 16 siglas FIFA | [T1](tasks/T1.md) | Fase 1 | — | Sim (com T5-proto N/A) | A Fazer |
-| T2 | Migração 000007 — tabela `matches` + query `ListUpcomingMatchesByUser` + `make sqlc` | [T2](tasks/T2.md) | Fase 1 | T1 | Nao | A Fazer |
-| T3 | Repository `MatchRepository` — wrapper sqlc + tipos de domínio | [T3](tasks/T3.md) | Fase 2 | T2 | Nao | A Fazer |
-| T4 | Service `MatchService` — orquestrador com corte via `clock.Clock` | [T4](tasks/T4.md) | Fase 2 | T3 | Nao | A Fazer |
-| T5 | Proto `MatchService` + `make proto` + Handler `MatchHandler` (protegido) | [T5](tasks/T5.md) | Fase 3 | T4 | Nao | A Fazer |
-| T6 | Wiring — `match.Module` (fx) + composition root + helper E2E | [T6](tasks/T6.md) | Fase 4 | T3, T4, T5 | Nao | A Fazer |
-| T7 | Testes E2E do `MatchService` (stack autenticado via bufconn) | [T7](tasks/T7.md) | Fase 4 | T6 | Nao | A Fazer |
+| T1 | Migração 000006 — coluna `code` + backfill das 16 siglas FIFA | [T1](tasks/T1.md) | Fase 1 | — | Sim (com T5-proto N/A) | Concluído |
+| T2 | Migração 000007 — tabela `matches` + query `ListUpcomingMatchesByUser` + `make sqlc` | [T2](tasks/T2.md) | Fase 1 | T1 | Nao | Concluído |
+| T3 | Repository `MatchRepository` — wrapper sqlc + tipos de domínio | [T3](tasks/T3.md) | Fase 2 | T2 | Nao | Concluído |
+| T4 | Service `MatchService` — orquestrador com corte via `clock.Clock` | [T4](tasks/T4.md) | Fase 2 | T3 | Nao | Concluído |
+| T5 | Proto `MatchService` + `make proto` + Handler `MatchHandler` (protegido) | [T5](tasks/T5.md) | Fase 3 | T4 | Nao | Concluído |
+| T6 | Wiring — `match.Module` (fx) + composition root + helper E2E | [T6](tasks/T6.md) | Fase 4 | T3, T4, T5 | Nao | Concluído |
+| T7 | Testes E2E do `MatchService` (stack autenticado via bufconn) | [T7](tasks/T7.md) | Fase 4 | T6 | Nao | Concluído |
 
 > **Observação sobre paralelismo**: o contrato proto (gerado dentro de T5) não depende da cadeia de DB; na prática a única paralelização real seria gerar o proto cedo. Como o proto está consolidado em T5 (handler é seu primeiro consumidor) e o caminho crítico é a cadeia de persistência, o pipeline é essencialmente sequencial. Nenhum lote paralelo é declarado (paths sobrepostos / dependências textuais entre camadas).
 
@@ -56,13 +56,13 @@ T1 -> T2 -> T3 -> T4 -> T5 -> T6 -> T7
 ### Grafo de Dependencias
 | Task | Depende de | Pode Rodar em Paralelo? | Status |
 |------|------------|-------------------------|--------|
-| T1 | — | Nao (caminho crítico) | A Fazer |
-| T2 | T1 | Nao | A Fazer |
-| T3 | T2 | Nao | A Fazer |
-| T4 | T3 | Nao | A Fazer |
-| T5 | T4 | Nao | A Fazer |
-| T6 | T3, T4, T5 | Nao | A Fazer |
-| T7 | T6 | Nao | A Fazer |
+| T1 | — | Nao (caminho crítico) | Concluído |
+| T2 | T1 | Nao | Concluído |
+| T3 | T2 | Nao | Concluído |
+| T4 | T3 | Nao | Concluído |
+| T5 | T4 | Nao | Concluído |
+| T6 | T3, T4, T5 | Nao | Concluído |
+| T7 | T6 | Nao | Concluído |
 
 ---
 
@@ -91,12 +91,12 @@ T1 -> T2 -> T3 -> T4 -> T5 -> T6 -> T7
 ---
 
 ## 7. Criterios de Conclusao Geral
-- [ ] Todas as tasks concluidas
-- [ ] Objetivo tecnico atingido (RPC autenticado devolve jogos futuros das favoritas; jogos passados não aparecem; partida com duas favoritas aparece uma vez; sem favoritas/sem jogos → vazio)
-- [ ] `make sqlc`, `make proto` verdes; código gerado commitado
-- [ ] `make test` verde (unit + integração + E2E)
-- [ ] `make build-all` (CGO off) verde
-- [ ] `ListUpcomingMatches` ausente de `providePublicMethods` (RPC protegido)
+- [x] Todas as tasks concluidas
+- [x] Objetivo tecnico atingido (RPC autenticado devolve jogos futuros das favoritas; jogos passados não aparecem; partida com duas favoritas aparece uma vez; sem favoritas/sem jogos → vazio)
+- [x] `make sqlc`, `make proto` verdes; código gerado commitado
+- [x] `make test` verde (unit + integração + E2E)
+- [x] `make build-all` (CGO off) verde
+- [x] `ListUpcomingMatches` ausente de `providePublicMethods` (RPC protegido)
 
 ---
 
