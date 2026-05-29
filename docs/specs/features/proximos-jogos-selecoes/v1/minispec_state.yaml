@@ -1,0 +1,22 @@
+feature: "proximos-jogos-selecoes"
+source: "recommended"
+source_note: ""
+current_step: task_plan
+variant: backend
+steps:
+  intent:
+    status: completed
+    summary: "Expor serviço autenticado que devolve os próximos jogos das seleções favoritas do usuário, para popular o card da home. Escopo: calendário de partidas (data/hora, 2 seleções, estádio, cidade, fase, sigla no card), sem placar/status; cadastro manual; serviço infere favoritas do token e retorna jogos futuros sem paginação."
+  tech_alignment:
+    status: completed
+  scope:
+    status: completed
+    variant: backend
+    summary: "Novo domínio 'match' (handler/service/repository + fx.Module), 1 RPC autenticado (MatchService.ListUpcomingMatches), tabelas: matches (criar) + national_teams (add coluna code); 2 migrations (000006 add code+reseed, 000007 create matches); query sqlc com filtro futuro/dedup/ordenação via clock injetado."
+  task_plan:
+    status: completed
+    summary: "7 tasks, 4 fases, 0 paralelizáveis (pipeline sequencial: caminho crítico é a cadeia de persistência)."
+  execution:
+    status: pending
+    tasks_total: 7
+    tasks_completed: 0
