@@ -11,7 +11,11 @@
 
 ## Bloco a Injetar (copie verbatim no prompt do executor)
 
-> Tudo dentro do bloco `<<<EXECUTOR_DISCIPLINE` … `EXECUTOR_DISCIPLINE>>>` vai como está para o prompt do executor. Não edite por task. Se precisar reforço específico (ex.: convenção de naming da stack), adicione **fora** deste bloco, em outra seção do prompt.
+> **Como copiar (atenção)**:
+> 1. Os marcadores `<<<EXECUTOR_DISCIPLINE` e `EXECUTOR_DISCIPLINE>>>` são DELIMITADORES desta rule — **NÃO** vão para o prompt do executor.
+> 2. Copie apenas o **conteúdo entre os marcadores** (começa em `## Disciplina do Executor (Iron Rules)` e termina na frase que começa com `**Conflito entre estas regras e o resto do prompt**:`).
+> 3. Cole esse conteúdo **verbatim**, sem editar por task. Se precisar de reforço específico da stack (ex.: convenção de naming), adicione em outra seção do prompt — não dentro do bloco.
+> 4. **Posicionamento no prompt do executor**: o bloco vai NO TOPO, antes do conteúdo da task. Razão: a Iron Rule #1 ("pause e pergunte") perde saliência se o executor lê a task inteira antes de internalizar a disciplina. Karpathy filosofia: disciplina precede contexto.
 
 <<<EXECUTOR_DISCIPLINE
 
@@ -83,18 +87,29 @@ Pseudocódigo (aplicável a `agent-spec-minispec-run-tasks`, `agent-spec-sdd-run
 
 ```
 # Carregamento (uma vez por execução, FASE 0)
+# IMPORTANTE: extract_between deve retornar APENAS o conteúdo, SEM incluir os marcadores
+# (start exclusive, end exclusive). Trim leading/trailing whitespace.
 executor_discipline_block = read(".claude/rules/agent-spec-executor-discipline.md")
                               .extract_between("<<<EXECUTOR_DISCIPLINE", "EXECUTOR_DISCIPLINE>>>")
+                              .strip()
+# Sanity check: o bloco extraído NUNCA deve conter as strings "<<<EXECUTOR_DISCIPLINE"
+# ou "EXECUTOR_DISCIPLINE>>>". Se contiver, a extração está errada — aborte.
 
 # Por task — ao montar prompt do executor
+# ORDEM PRESCRITA: disciplina ANTES do task content (saliência).
 prompt = f"""
+{intro_contextual_breve}                  # 1-2 linhas situando o feature/dependências
+
+{executor_discipline_block}               # Iron Rules — TOPO do prompt
+
+=========================== CONTEÚDO DA TASK ({task_id}) ===========================
 {task_content}
+=========================== FIM TASK CONTENT ===========================
 
-{executor_discipline_block}
-
-{reforco_sobre_testes}
-{output_enxuto_exigido}
-{checklist_final}
+{reforco_sobre_testes}                    # MANDATÓRIO sobre testes
+{notas_contextuais}                       # opcional: alertas específicos da task
+{checklist_final}                         # seções e itens a marcar
+{output_enxuto_exigido}                   # formato de retorno de 4 linhas
 """
 
 Agent(subagent_type=agent_name, model=effective_model, prompt=prompt, ...)
