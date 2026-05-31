@@ -243,7 +243,7 @@ Aplique durante TODA a execução:
    ```
    Marker do estado atual antes da execução. Mantenha em variável do orquestrador; será passado inline ao QA (Passo 4) e ao Tech Review (Passo 5).
 5. **Cleanup idempotente** da memória temporária: delete arquivos em `shared.temp_memory.dir` com idade > 24h (`cleanup_stale_hours`).
-5.1. **Leia [`.claude/rules/agent-spec-executor-discipline.md`](.claude/rules/agent-spec-executor-discipline.md)** — extraia o bloco entre `<<<EXECUTOR_DISCIPLINE` e `EXECUTOR_DISCIPLINE>>>` e mantenha em memória. Será injetado **verbatim** no prompt do executor (Passo 2). Logue UMA vez no `shared.qa_observations.path`: `[run] executor_discipline injetado (fonte: agent-spec-executor-discipline.md)`.
+5.1. **Leia [`references/executor-discipline.md`](references/executor-discipline.md)** (symlink que aponta para o canônico em `agent-spec-minispec-run-tasks/references/`) — extraia o bloco entre `<<<EXECUTOR_DISCIPLINE` e `EXECUTOR_DISCIPLINE>>>` e mantenha em memória. Será injetado **verbatim** no prompt do executor (Passo 2). Logue UMA vez no `shared.qa_observations.path`: `[run] executor_discipline injetado (fonte: references/executor-discipline.md)`.
 
 5.2. **Instrumentação de rule mining (não-bloqueante)** — durante o run, persista candidatos a regra em `shared.rule_candidates.path` conforme a subseção **"Persistência pelo orquestrador"** de [`agent-spec-workflow-rules.md`](.claude/rules/agent-spec-workflow-rules.md) → "Candidatos a Regra". Trigger points no fluxo TaskCard (1 task por run):
 
@@ -292,20 +292,38 @@ Agent(
 
 > **Nota**: a variante "execução direta pelo orquestrador" (sem `Agent()`) foi removida — sempre delegamos para `Agent`, garantindo isolamento de contexto e logs uniformes. Se o usuário deseja o agente padrão, escolhe "Default" na descoberta e o Caso B é usado.
 
-**Prompt de delegação ao executor**:
-- **Disciplina do Executor (Iron Rules) — OBRIGATÓRIO**: cole **verbatim** o bloco entre os marcadores `<<<EXECUTOR_DISCIPLINE` … `EXECUTOR_DISCIPLINE>>>` de [`.claude/rules/agent-spec-executor-discipline.md`](.claude/rules/agent-spec-executor-discipline.md) carregado no Passo 1.5.1. O sub-agente roda em contexto isolado e NÃO enxerga essa rule pelo system-prompt — só vê o que vier no prompt construído por este orquestrador. Sem o bloco, as 4 Iron Rules não chegam ao executor.
-- **Objetivo da Task** (seção 3 da TaskCard)
-- **Descrição de Execução** (seção 5)
-- **Restrições / Guardrails** (seção 6 — DEVE / NÃO DEVE)
-- **Passos Sugeridos** (seção 7) — execute na ordem
-- **Arquivos Envolvidos**: 8.1 De Referência (leitura), 8.2 A Criar, 8.3 A Modificar
-- **Aceite Técnico** (seção 9)
-- **Testes** (seção 10) — DEVE criar e executar
-- **Reforço sobre testes (MANDATÓRIO)** — ver Regras Gerais de Economia §1
-- **Output enxuto exigido** — ver Regras Gerais de Economia §2
-- **Validação contínua de guardrails**: a cada passo, valide DEVE e NÃO DEVE da seção 6. Se algo conflitar → **PARE e avise** via `AskUserQuestion`.
-- **Modificar APENAS arquivos listados** nas seções 8.2 e 8.3 (e arquivos de teste da seção 10).
-- **Rodar testes** ao final e garantir que passam.
+**Prompt de delegação ao executor — TEMPLATE ESTRUTURAL (ordem prescrita, NÃO reorganize)**:
+
+```
+[1] Intro contextual (1-2 linhas situando a TaskCard e dependências relevantes)
+
+[2] Disciplina do Executor (Iron Rules) — TOPO, antes do task content
+    └─ cole APENAS o conteúdo ENTRE os marcadores «<<<EXECUTOR_DISCIPLINE» e
+       «EXECUTOR_DISCIPLINE>>>» da referência `references/executor-discipline.md`
+       (carregada no Passo 1.5.1). NÃO cole os marcadores. NÃO edite o conteúdo.
+       Sanity check pós-extração: o texto colado NUNCA deve conter as substrings
+       "<<<EXECUTOR_DISCIPLINE" ou "EXECUTOR_DISCIPLINE>>>".
+
+[3] =========================== CONTEÚDO DA TASKCARD (TC-{id}) ===========================
+    {Objetivo (seção 3) + Descrição de Execução (seção 5) + Restrições/Guardrails (seção 6)
+     + Passos Sugeridos (seção 7) + Arquivos Envolvidos (8.1 Referência, 8.2 A Criar,
+     8.3 A Modificar) + Aceite Técnico (seção 9) + Testes (seção 10)}
+    =========================== FIM TASKCARD CONTENT ===========================
+
+[4] Reforço sobre testes (MANDATÓRIO) — ver Regras Gerais de Economia §1
+[5] Output enxuto exigido — ver Regras Gerais de Economia §2
+[6] Validação contínua de guardrails — a cada passo, valide DEVE e NÃO DEVE da seção 6.
+    Se algo conflitar → PARE e avise via `AskUserQuestion`.
+[7] Modificar APENAS arquivos listados em 8.2 e 8.3 (+ testes da seção 10).
+[8] Rodar testes ao final e garantir que passam.
+```
+
+**Por que esta ordem**: a Iron Rule #1 ("pause e pergunte") perde saliência se o executor lê a TaskCard inteira antes de internalizar a disciplina. Por isso o bloco vai NO TOPO. Reforços e validações contínuas vão DEPOIS porque referenciam seções concretas da TaskCard.
+
+**Detalhamento de cada bloco**:
+
+- **[2] Disciplina do Executor (Iron Rules) — OBRIGATÓRIO**: o sub-agente roda em contexto isolado e NÃO enxerga essa referência pelo system-prompt (ela vive em `references/`, lida sob demanda). Sem o bloco, as 4 Iron Rules não chegam ao executor. **Cole apenas o conteúdo entre os marcadores** — começa em `## Disciplina do Executor (Iron Rules)` e termina na frase iniciada por `**Conflito entre estas regras e o resto do prompt**:`. Os marcadores `<<<EXECUTOR_DISCIPLINE` e `EXECUTOR_DISCIPLINE>>>` são DELIMITADORES da referência e **nunca** vão para o prompt.
+- **[3] Conteúdo da TaskCard**: entre delimitadores visuais explícitos para o executor distinguir disciplina vs task.
 
 ### Passo 3 — Validar aceite técnico
 
@@ -754,7 +772,7 @@ Observações: [se houver]
 11. **Cleanup de memória lazy** `TC-[id].md` ao aprovar AMBOS os gates (se foi criada por rejeição).
 12. **Cleanup idempotente** (>24h) no início da execução.
 13. **Logar resolução de modelo/gates** no terminal antes de invocar executor/gates.
-14. **Injetar o bloco "Disciplina do Executor (Iron Rules)"** verbatim no prompt do executor — fonte canônica em [`.claude/rules/agent-spec-executor-discipline.md`](.claude/rules/agent-spec-executor-discipline.md) (entre os marcadores `<<<EXECUTOR_DISCIPLINE` … `EXECUTOR_DISCIPLINE>>>`). O sub-agente NÃO herda esse arquivo via system-prompt; sem o bloco no prompt, as 4 Iron Rules (Pense antes de codar / Simplicidade primeiro / Cirúrgico / Goal-driven) não chegam ao executor.
+14. **Injetar o bloco "Disciplina do Executor (Iron Rules)"** verbatim no prompt do executor — fonte: [`references/executor-discipline.md`](references/executor-discipline.md) (symlink que aponta para o canônico em `agent-spec-minispec-run-tasks/references/`; conteúdo entre os marcadores `<<<EXECUTOR_DISCIPLINE` … `EXECUTOR_DISCIPLINE>>>`). O sub-agente NÃO herda essa referência via system-prompt; sem o bloco no prompt, as 4 Iron Rules (Pense antes de codar / Simplicidade primeiro / Cirúrgico / Goal-driven) não chegam ao executor.
 
 ### NÃO DEVE
 
@@ -777,7 +795,7 @@ Observações: [se houver]
 - [ ] `base_sha` capturado antes do executor
 - [ ] Cleanup idempotente de memória stale executado
 - [ ] `model`/`risk`/`gates` resolvidos com logs no terminal
-- [ ] Bloco "Disciplina do Executor (Iron Rules)" carregado de `agent-spec-executor-discipline.md` no início e injetado no prompt do executor
+- [ ] Bloco "Disciplina do Executor (Iron Rules)" carregado de `references/executor-discipline.md` no início e injetado no prompt do executor
 - [ ] Executor invocado com `effective_model` correto (delegado a `agent_name` se fornecido)
 - [ ] `base_sha` + sumário do executor passados inline ao QA e ao Tech Review (sem arquivo intermediário)
 - [ ] Sumário mínimo do QA enviado ao Tech Review (não JSON completo)

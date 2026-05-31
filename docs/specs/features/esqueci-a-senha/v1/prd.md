@@ -6,7 +6,7 @@
 - **Data**: 2026-05-29
 - **Versão**: v1
 - **Status**: Draft
-- **Relacionados**: `pre-refinement.md` (discovery desta feature), `arquitetura-base/v1` (domínio `auth` — Register/Login/GetMe), ADR-0003 (Sessão JWT 1h sem refresh), ADR-0006 (recuperação de senha via senha temporária por e-mail), Glossário de Domínio (`User`, `Sessão`)
+- **Relacionados**: `pre-refinement.md` (discovery desta feature), `arquitetura-base/v1` (domínio `auth` — Register/Login/GetMe), ADR-0003 (Sessão JWT 1h sem refresh), ADR-0006 (envio de e-mail transacional via Resend com interface no consumidor — capacidade de infra que esta feature consome), Glossário de Domínio (`User`, `Sessão`)
 
 ---
 
@@ -29,13 +29,15 @@
 ### 4.1 O que está incluído (dentro do O QUE)
 - [ ] Solicitação de recuperação informando apenas o e-mail da conta.
 - [ ] Geração de uma **senha temporária pelo sistema** (aleatória e forte), enviada ao usuário por e-mail.
-- [ ] Envio de **um único e-mail transacional em texto simples** contendo a senha temporária, sua validade e a instrução de troca.
+- [ ] Envio de **e-mail transacional em texto simples** contendo a senha temporária, sua validade e a instrução de troca.
+- [ ] **A senha original permanece válida** durante a recuperação: a senha temporária é uma credencial **adicional**, não substitui a senha vigente. Só a troca definitiva substitui a senha.
 - [ ] **Resposta sempre genérica** ao pedido de recuperação — não revela se o e-mail está ou não cadastrado.
 - [ ] **Expiração da senha temporária em 15 minutos** a partir da emissão.
-- [ ] **Troca obrigatória de senha** no primeiro login feito com a senha temporária.
+- [ ] **Troca obrigatória de senha** no login feito com a senha temporária.
 - [ ] Sinalização, no login, de que há uma troca de senha pendente.
 - [ ] Ação dedicada para o usuário trocar a senha (informando a senha atual e a nova).
 - [ ] Invalidação da senha temporária assim que a nova senha é definida.
+- [ ] **Envio de um e-mail de notificação** ao concluir a troca de senha, informando que a senha foi alterada e orientando a redefinição caso o usuário não reconheça a ação.
 
 ### 4.2 O que está explicitamente fora do escopo
 - [ ] Recuperação por token/código de uso único ou OTP numérico — podado; optou-se por senha temporária.
@@ -62,6 +64,8 @@
 - **US-04**: Como usuário, quero definir uma nova senha definitiva, para retomar o uso normal da conta e invalidar a senha temporária.
 - **US-05**: Como usuário, quero que o sistema não revele se meu e-mail está cadastrado ao pedir recuperação, para proteger minha privacidade.
 - **US-06**: Como usuário, quero que a senha temporária deixe de funcionar após um curto período, para reduzir o risco de uso indevido caso o e-mail seja exposto.
+- **US-07**: Como usuário que solicitou recuperação por engano (ou que teve a recuperação acionada por terceiro), quero que minha senha original continue funcionando, para não perder o acesso à conta sem ter trocado a senha de propósito.
+- **US-08**: Como usuário, quero ser avisado por e-mail quando minha senha for alterada, para perceber e reagir caso a troca não tenha sido feita por mim.
 
 ---
 
@@ -76,6 +80,8 @@
 - **RN7** — A senha do usuário e a senha temporária **nunca** são registradas em log ou exibidas, exceto no corpo do e-mail destinado ao próprio usuário.
 - **RN8** — Definir a nova senha **invalida** a senha temporária e remove a pendência de troca.
 - **RN9 (limitação conhecida)** — A troca de senha **não invalida** Sessões (JWT) já emitidas; elas expiram naturalmente em até 1h (ADR-0003).
+- **RN10** — A geração da senha temporária **não invalida a senha original**: durante a validade da temporária, ambas são aceitas no login. Logar com a original mantém o acesso normal (sem troca obrigatória); logar com a temporária dispara a troca obrigatória. Apenas a troca definitiva substitui a senha vigente.
+- **RN11** — Ao concluir a troca de senha, o sistema envia (best-effort) um e-mail notificando a alteração e orientando o usuário a redefinir a senha caso não reconheça a ação. A falha no envio desse e-mail **não bloqueia** a troca (é apenas registrada internamente) e a senha/temporária **nunca** aparecem nesse e-mail.
 
 ---
 
@@ -88,11 +94,12 @@
 4. O usuário entra no app usando a senha temporária recebida.
 5. O sistema autentica o usuário e sinaliza que há uma troca de senha obrigatória pendente.
 6. O usuário define uma nova senha definitiva (informando a senha temporária atual e a nova).
-7. O sistema confirma a troca, invalida a senha temporária e remove a pendência; o usuário segue usando o app normalmente.
+7. O sistema confirma a troca, invalida a senha temporária, remove a pendência e **envia um e-mail notificando a alteração da senha**; o usuário segue usando o app normalmente.
 
 ### 7.2 Fluxos Alternativos
 - **E-mail não cadastrado**: o sistema responde exatamente a mesma mensagem genérica e não envia e-mail algum — sem indicar que a conta não existe.
-- **Falha no envio do e-mail**: o sistema mantém a resposta genérica ao usuário e registra a falha internamente; o usuário não percebe diferença.
+- **Falha no envio do e-mail**: o sistema mantém a resposta genérica ao usuário e registra a falha internamente; o usuário não percebe diferença. Vale tanto para o e-mail da senha temporária quanto para o de notificação de troca.
+- **Usuário lembra a senha original**: mesmo após solicitar recuperação, o usuário pode entrar normalmente com a senha original; o acesso é concedido sem troca obrigatória e a senha temporária simplesmente expira sem uso.
 - **Senha temporária expirada**: se o usuário tentar entrar com a senha temporária após 15 minutos, o acesso é negado; ele precisa solicitar uma nova recuperação.
 - **Cadastro normal**: usuários que se cadastram escolhendo a própria senha não passam por troca obrigatória.
 
@@ -108,6 +115,9 @@
 - [ ] **CA-07**: DADO que o usuário concluiu a troca QUANDO ele tenta logar novamente com a senha temporária ENTÃO o acesso é negado (a temporária foi invalidada).
 - [ ] **CA-08**: DADO um usuário que se cadastrou pelo fluxo normal QUANDO ele faz o primeiro login ENTÃO **nenhuma** troca obrigatória é exigida.
 - [ ] **CA-09**: DADO qualquer etapa do fluxo QUANDO o sistema registra logs ENTÃO a senha e a senha temporária **nunca** aparecem nos registros.
+- [ ] **CA-10**: DADO um usuário que solicitou recuperação mas lembra a senha original QUANDO ele faz login com a senha original (a temporária ainda válida ou já expirada) ENTÃO o acesso é concedido normalmente e **nenhuma** troca obrigatória é exigida.
+- [ ] **CA-11**: DADO um usuário com troca pendente QUANDO ele conclui a troca informando a senha temporária e a nova senha ENTÃO o sistema envia um e-mail notificando a alteração da senha.
+- [ ] **CA-12**: DADO que o envio do e-mail de notificação de troca falha QUANDO o usuário conclui a troca ENTÃO a troca é efetivada normalmente e a falha é apenas registrada internamente.
 
 ---
 
@@ -116,6 +126,8 @@
 - **Janela de 15 minutos é apertada** para o ciclo "receber e-mail → logar → trocar"; atraso na entrega pode expirar a senha antes do uso. Decisão travada para a v1; ampliar (ex.: 30–60 min) se houver atrito medido.
 - **Sem limite de tentativas (rate limit)** no pedido de recuperação na v1 — risco de flood de e-mails reconhecido e adiado para v2.
 - **Senha temporária em texto trafega e persiste no inbox** do usuário — ônus assumido conscientemente, mitigado por expiração curta + troca obrigatória + proibição de logar a senha.
+- **Coexistência de credenciais durante a recuperação** — manter a senha original válida ao lado da temporária (RN10) implica duas credenciais aceitas no login durante a janela de 15 min. Trade-off aceito: leve aumento de superfície em troca de eliminar o lockout/griefing por pedido acidental ou malicioso.
+- **Dois e-mails transacionais** — a feature passa a enviar dois e-mails (senha temporária + notificação de troca, RN11), ambos best-effort e em texto simples, via a capacidade de e-mail transacional da ADR-0006. Template/identidade visual segue adiado para v2.
 - **Sessões (JWT) são stateless** — a troca de senha não as invalida; expiram em 1h (ADR-0003).
 - **Idioma**: mensagens ao usuário (e-mail e respostas) em pt-BR; identificadores de domínio seguem o glossário (`User`, `Sessão`).
 
@@ -147,6 +159,8 @@
 | US-04 | Definir nova senha e invalidar a temporária | CA-06, CA-07 |
 | US-05 | Pedido não revela existência do e-mail | CA-02 |
 | US-06 | Senha temporária expira em curto prazo | CA-05 |
+| US-07 | Senha original continua válida durante a recuperação | CA-10 |
+| US-08 | Aviso por e-mail quando a senha é alterada | CA-11, CA-12 |
 
 > Regras transversais de segurança/escopo cobertas adicionalmente por: CA-08 (gatilho só pós-reset, ligado à RN6) e CA-09 (não logar senha, ligado à RN7).
 

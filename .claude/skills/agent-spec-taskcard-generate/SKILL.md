@@ -173,7 +173,7 @@ Ao gerar cada TaskCard, você DEVE preencher os 3 campos do frontmatter da seç�
 - `risk`: **low** | **medium** | **high**
 - `gates`: **[qa, tech_review]** (default) | **[qa]** | **none** (task trivial)
 
-**Lógica completa**: ver `.claude/ai-framework/model-selection.md`. Leia e aplique.
+**Lógica completa**: ver `.claude/rules/agent-spec-workflow-rules.md` (seções "Critical Paths — Heurística de Áreas Sensíveis", "Executor model rules" e "Gates inference rules") — já carregada no system-prompt.
 
 **Resumo `model` e `risk`** (cross-framework):
 

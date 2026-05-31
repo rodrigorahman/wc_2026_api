@@ -24,7 +24,7 @@
 11. **Cleanup de memória** ao aprovar AMBOS os gates.
 12. **Cleanup idempotente** (>24h) no início da execução.
 13. **Logar resolução de modelo/gates** no terminal antes de invocar executor/gates.
-14. **Injetar o bloco "Disciplina do Executor (Iron Rules)"** verbatim no prompt de TODO executor invocado — fonte canônica em `.claude/rules/agent-spec-executor-discipline.md` (entre os marcadores `<<<EXECUTOR_DISCIPLINE` … `EXECUTOR_DISCIPLINE>>>`). O sub-agente NÃO herda esse arquivo via system-prompt; sem o bloco no prompt, as 4 Iron Rules (Pense antes de codar / Simplicidade primeiro / Cirúrgico / Goal-driven) não chegam ao executor.
+14. **Injetar o bloco "Disciplina do Executor (Iron Rules)"** verbatim no prompt de TODO executor invocado — fonte: `references/executor-discipline.md` (entre os marcadores `<<<EXECUTOR_DISCIPLINE` … `EXECUTOR_DISCIPLINE>>>`). O sub-agente NÃO herda essa referência via system-prompt (ela vive sob demanda em `references/`, não em `.claude/rules/`); sem o bloco no prompt, as 4 Iron Rules (Pense antes de codar / Simplicidade primeiro / Cirúrgico / Goal-driven) não chegam ao executor.
 
 ### NÃO DEVE
 
@@ -47,7 +47,7 @@
 - [ ] Cleanup idempotente de memória stale executado
 - [ ] `minispec_state.yaml` atualizado para `execution: in_progress` no início
 - [ ] Cada task processada respeitando o algoritmo de "Execução Paralela de Tasks" (lote paralelo com guards OU sequencial); gates dentro de cada task continuam SEQUENCIAIS (QA → TR)
-- [ ] Bloco "Disciplina do Executor (Iron Rules)" carregado de `.claude/rules/agent-spec-executor-discipline.md` no início e injetado no prompt de cada executor
+- [ ] Bloco "Disciplina do Executor (Iron Rules)" carregado de `references/executor-discipline.md` no início e injetado no prompt de cada executor
 - [ ] `model`/`risk`/`gates` resolvidos por task com logs no terminal
 - [ ] `base_sha` capturado por task
 - [ ] Execution summary criado após cada executor concluir

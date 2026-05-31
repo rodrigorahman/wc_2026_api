@@ -243,7 +243,7 @@ Você sempre terá acesso a:
    Se falhar, **aborte com mensagem clara**:
    > "Esta skill exige um repositório git (diff_strategy.git_required: true). Inicialize com `git init && git add -A && git commit -m 'baseline'` e tente novamente."
 4. **Cleanup idempotente** da memória temporária: delete arquivos em `shared.temp_memory.dir` com idade > 24h (`cleanup_stale_hours`).
-4.1. **Leia [`.claude/rules/agent-spec-executor-discipline.md`](.claude/rules/agent-spec-executor-discipline.md)** — extraia o bloco entre `<<<EXECUTOR_DISCIPLINE` e `EXECUTOR_DISCIPLINE>>>` e mantenha em memória. Será injetado **verbatim** no prompt de cada executor (Passo 3.3). Logue UMA vez no `shared.qa_observations.path`: `[run] executor_discipline injetado (fonte: agent-spec-executor-discipline.md)`.
+4.1. **Leia [`references/executor-discipline.md`](references/executor-discipline.md)** (symlink que aponta para o canônico em `agent-spec-minispec-run-tasks/references/`) — extraia o bloco entre `<<<EXECUTOR_DISCIPLINE` e `EXECUTOR_DISCIPLINE>>>` e mantenha em memória. Será injetado **verbatim** no prompt de cada executor (Passo 3.3). Logue UMA vez no `shared.qa_observations.path`: `[run] executor_discipline injetado (fonte: references/executor-discipline.md)`.
 
 4.2. **Instrumentação de rule mining (não-bloqueante)** — durante o run, persista candidatos a regra em `shared.rule_candidates.path` conforme a subseção **"Persistência pelo orquestrador"** de [`agent-spec-workflow-rules.md`](.claude/rules/agent-spec-workflow-rules.md) → "Candidatos a Regra". Trigger points no fluxo SDD:
 
@@ -345,16 +345,40 @@ Agent(
 )
 ```
 
-**Prompt de delegação ao executor**:
-- **Objetivo da Task** (seção 2 da task)
-- **Descrição Detalhada** (seção 3)
-- **Aceite Técnico** (seção 4)
-- **Arquivos Impactados**: 5.1 A Criar, 5.2 A Modificar, 5.3 De Referência
-- **Testes** (seção 6) — DEVE criar e executar
-- **User Stories Relacionadas** (campo na seção 1)
-- **Caminhos de referência opcionais**: TECH_SPEC (`sdd.tech_spec.path`) e PRD (`sdd.prd.path`) — apenas paths; o executor decide se consulta
-- **Disciplina do Executor (Iron Rules) — OBRIGATÓRIO**: cole **verbatim** o bloco entre os marcadores `<<<EXECUTOR_DISCIPLINE` … `EXECUTOR_DISCIPLINE>>>` de [`.claude/rules/agent-spec-executor-discipline.md`](.claude/rules/agent-spec-executor-discipline.md) carregado na Inicialização (Passo 1.4.1). O sub-agente roda em contexto isolado e NÃO enxerga essa rule pelo system-prompt — só vê o que vier no prompt construído por este orquestrador. Sem o bloco, as 4 Iron Rules não chegam ao executor.
-- **Reforço sobre testes (MANDATÓRIO)**:
+**Prompt de delegação ao executor — TEMPLATE ESTRUTURAL (ordem prescrita, NÃO reorganize)**:
+
+```
+[1] Intro contextual (1-2 linhas situando o feature e dependências relevantes)
+
+[2] Disciplina do Executor (Iron Rules) — TOPO, antes do task content
+    └─ cole APENAS o conteúdo ENTRE os marcadores «<<<EXECUTOR_DISCIPLINE» e
+       «EXECUTOR_DISCIPLINE>>>» da referência `references/executor-discipline.md`
+       (carregada na Inicialização — Passo 1.4.1). NÃO cole os marcadores.
+       NÃO edite o conteúdo. Sanity check pós-extração: o texto colado NUNCA
+       deve conter as substrings "<<<EXECUTOR_DISCIPLINE" ou "EXECUTOR_DISCIPLINE>>>".
+
+[3] =========================== CONTEÚDO DA TASK (T{N}) ===========================
+    {Objetivo (seção 2) + Descrição Detalhada (seção 3) + Aceite Técnico (seção 4)
+     + Arquivos Impactados (5.1 A Criar, 5.2 A Modificar, 5.3 De Referência)
+     + Testes (seção 6) + User Stories Relacionadas (campo da seção 1)}
+    =========================== FIM TASK CONTENT ===========================
+
+[4] Caminhos de referência opcionais: TECH_SPEC (`sdd.tech_spec.path`) e PRD
+    (`sdd.prd.path`) — apenas paths; o executor decide se consulta.
+
+[5] Reforço sobre testes (MANDATÓRIO) — texto abaixo
+[6] Notas contextuais opcionais (alertas específicos da task)
+[7] Checklist Final (seção 8 da task) — itens a marcar
+[8] Output enxuto exigido — formato de retorno
+```
+
+**Por que esta ordem**: a Iron Rule #1 ("pause e pergunte") perde saliência se o executor lê a task inteira antes de internalizar a disciplina. Por isso o bloco vai NO TOPO. Reforço de testes, checklist e output enxuto vão DEPOIS do task content porque referenciam seções concretas dela.
+
+**Detalhamento de cada bloco**:
+
+- **[2] Disciplina do Executor (Iron Rules) — OBRIGATÓRIO**: o sub-agente roda em contexto isolado e NÃO enxerga essa referência pelo system-prompt (ela vive em `references/`, lida sob demanda). Sem o bloco, as 4 Iron Rules não chegam ao executor. **Cole apenas o conteúdo entre os marcadores** — começa em `## Disciplina do Executor (Iron Rules)` e termina na frase iniciada por `**Conflito entre estas regras e o resto do prompt**:`. Os marcadores `<<<EXECUTOR_DISCIPLINE` e `EXECUTOR_DISCIPLINE>>>` são DELIMITADORES da referência e **nunca** vão para o prompt.
+- **[3] Conteúdo da task**: entre delimitadores visuais explícitos para o executor distinguir disciplina vs task.
+- **[5] Reforço sobre testes (MANDATÓRIO)**:
   > "A seção 6 (Testes) NÃO é opcional. Implemente TODOS os arquivos de teste antes de retornar. Se o projeto não tiver engine de teste configurada, PAUSE e pergunte ao usuário (a) configurar engine / (b) gerar testes sem execução / (c) ignorar explicitamente. Nunca ignore silenciosamente."
 - **Output enxuto exigido**:
   > "Ao concluir, retorne APENAS o formato: `✅ T[ID] — [Nome] / Arquivos: X criados, Y modificados / Testes: N/M implementados ([engine]) / Pendências: [...]`. NÃO retorne diffs, descrições, relatórios longos ou sugestões — apenas esse bloco de 4 linhas."
@@ -851,7 +875,7 @@ Aplique durante TODA a execução:
 11. **Cleanup de memória** ao aprovar AMBOS os gates.
 12. **Cleanup idempotente** (>24h) no início da execução.
 13. **Logar resolução de modelo/gates** no terminal antes de invocar executor/gates.
-14. **Injetar o bloco "Disciplina do Executor (Iron Rules)"** verbatim no prompt de TODO executor invocado — fonte canônica em [`.claude/rules/agent-spec-executor-discipline.md`](.claude/rules/agent-spec-executor-discipline.md) (entre os marcadores `<<<EXECUTOR_DISCIPLINE` … `EXECUTOR_DISCIPLINE>>>`). O sub-agente NÃO herda esse arquivo via system-prompt; sem o bloco no prompt, as 4 Iron Rules (Pense antes de codar / Simplicidade primeiro / Cirúrgico / Goal-driven) não chegam ao executor.
+14. **Injetar o bloco "Disciplina do Executor (Iron Rules)"** verbatim no prompt de TODO executor invocado — fonte: [`references/executor-discipline.md`](references/executor-discipline.md) (symlink que aponta para o canônico em `agent-spec-minispec-run-tasks/references/`; conteúdo entre os marcadores `<<<EXECUTOR_DISCIPLINE` … `EXECUTOR_DISCIPLINE>>>`). O sub-agente NÃO herda essa referência via system-prompt; sem o bloco no prompt, as 4 Iron Rules (Pense antes de codar / Simplicidade primeiro / Cirúrgico / Goal-driven) não chegam ao executor.
 
 ### NÃO DEVE
 
@@ -886,7 +910,7 @@ Ao final, produza saída em Markdown com seções:
 - [ ] Repositório git verificado no início
 - [ ] Cleanup idempotente de memória stale executado
 - [ ] `sdd_state.yaml` atualizado para `execution: in_progress` no início
-- [ ] Bloco "Disciplina do Executor (Iron Rules)" carregado de `agent-spec-executor-discipline.md` no início e injetado no prompt de cada executor
+- [ ] Bloco "Disciplina do Executor (Iron Rules)" carregado de `references/executor-discipline.md` no início e injetado no prompt de cada executor
 - [ ] Cada task processada SEQUENCIALMENTE com gates SEQUENCIAIS
 - [ ] `model`/`risk`/`gates` resolvidos por task com logs no terminal
 - [ ] `base_sha` capturado por task

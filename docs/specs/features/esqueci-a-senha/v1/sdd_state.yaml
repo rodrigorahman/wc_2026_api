@@ -1,5 +1,6 @@
 feature: "Esqueci a senha — recuperação de acesso por e-mail"
-current_step: prd
+current_step: tech_spec
+variant: backend
 source: "recommended"
 source_note: ""
 steps:
@@ -7,9 +8,11 @@ steps:
     status: completed
     summary: "6 US, 9 CA. Recuperação de acesso por senha temporária via e-mail, com troca obrigatória pós-reset e expiração de 15 min."
   tech_alignment:
-    status: pending
+    status: completed
   tech_spec:
-    status: pending
+    status: completed
+    variant: backend
+    summary: "Estende AuthService (RequestPasswordRecovery + ChangePassword) e Login (password_change_required); EmailSender/ResendSender/NoopSender; users +temp_password_hash/+temp_password_expires_at (migração 000009); 38 CTs."
   validation:
     status: pending
   task_plan:

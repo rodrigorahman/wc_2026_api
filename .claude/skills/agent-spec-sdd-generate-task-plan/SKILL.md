@@ -195,7 +195,7 @@ Ao gerar cada `tasks/TN.md`, você DEVE preencher corretamente os 3 campos do fr
 - `risk`: nível de risco da task (**low** | **medium** | **high**)
 - `gates`: quais gates rodar após execução (default `[qa, tech_review]`; **`none`** em tasks triviais)
 
-**A lógica completa está em `.claude/ai-framework/model-selection.md`.** Leia e aplique.
+**A lógica completa está em `.claude/rules/agent-spec-workflow-rules.md`** (seções "Critical Paths — Heurística de Áreas Sensíveis", "Executor model rules" e "Gates inference rules") — já carregada no system-prompt.
 
 **Resumo da heurística `model`** (cross-framework):
 

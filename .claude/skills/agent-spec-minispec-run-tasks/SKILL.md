@@ -93,6 +93,7 @@ Use **exclusivamente** os templates de `.claude/rules/agent-spec-minispec-workfl
 | [`references/qa-validator-prompt.md`](references/qa-validator-prompt.md) | Prompt completo do Gate 1 (`agent-spec-qa-validator`) + passos de preparação (3.1, 3.2, 3.3) + interpretação (3.4) + loop de correção QA (3.5). | Antes de entrar na FASE 3 (Gate 1 — QA). |
 | [`references/staff-review-prompt.md`](references/staff-review-prompt.md) | Prompt completo do Gate 2 (`agent-spec-staff-architecture-review`) + passos de preparação (4.1) + interpretação (4.3) + loop de correção (4.4) + stage `git add` (4.5) + escalação ao usuário (4.6). | Antes de entrar na FASE 4 (Gate 2 — Tech Review). |
 | [`references/guardrails.md`](references/guardrails.md) | Guardrails Invioláveis (DEVE / NÃO DEVE) + Checklist Final do Orquestrador. | Após FASE 0 (internalizar) e antes de encerrar (validar checklist). |
+| [`references/executor-discipline.md`](references/executor-discipline.md) | Bloco "Disciplina do Executor (Iron Rules)" — 4 regras anti-vícios-de-LLM (adaptação Karpathy) entre marcadores `<<<EXECUTOR_DISCIPLINE … EXECUTOR_DISCIPLINE>>>`. Arquivo canônico (symlinks em `agent-spec-sdd-run-tasks` e `agent-spec-taskcard-run`). | FASE 0 (carregar bloco em memória) + FASE 2.3 (injetar verbatim no TOPO do prompt de cada executor). |
 
 ---
 
@@ -102,7 +103,7 @@ Use **exclusivamente** os templates de `.claude/rules/agent-spec-minispec-workfl
 2. Derive `{feature}` e `{version}` do `task_plan_path`.
 3. **Leia [`references/config.md`](references/config.md)** — internalize `subagentes dos gates`, `critical_paths`, `executor_model_rules`, `auto-escalate`, `escalação dos gates`, `diff_strategy`, `cleanup`.
 4. **Leia [`references/guardrails.md`](references/guardrails.md)** — internalize os DEVE / NÃO DEVE antes de qualquer ação.
-4.1. **Leia [`.claude/rules/agent-spec-executor-discipline.md`](.claude/rules/agent-spec-executor-discipline.md)** — extraia o bloco entre `<<<EXECUTOR_DISCIPLINE` e `EXECUTOR_DISCIPLINE>>>` e mantenha em memória. Será injetado **verbatim** no prompt de cada executor (FASE 2.3). Logue UMA vez no `shared.qa_observations.path`: `[run] executor_discipline injetado (fonte: agent-spec-executor-discipline.md)`.
+4.1. **Leia [`references/executor-discipline.md`](references/executor-discipline.md)** — extraia o bloco entre `<<<EXECUTOR_DISCIPLINE` e `EXECUTOR_DISCIPLINE>>>` e mantenha em memória. Será injetado **verbatim** no prompt de cada executor (FASE 2.3). Logue UMA vez no `shared.qa_observations.path`: `[run] executor_discipline injetado (fonte: references/executor-discipline.md)`.
 
 4.2. **Instrumentação de rule mining (não-bloqueante)** — durante o run, persista candidatos a regra em `shared.rule_candidates.path` conforme a subseção **"Persistência pelo orquestrador"** de [`agent-spec-workflow-rules.md`](.claude/rules/agent-spec-workflow-rules.md) → "Candidatos a Regra". Trigger points no fluxo miniSpec:
 
@@ -211,14 +212,40 @@ Agent(
 )
 ```
 
-**Prompt de delegação ao executor**:
-- **Conteúdo completo do arquivo da task individual** (objetivo, descrição, critério de conclusão, arquivos impactados, testes)
-- **Disciplina do Executor (Iron Rules) — OBRIGATÓRIO**: cole **verbatim** o bloco entre os marcadores `<<<EXECUTOR_DISCIPLINE` … `EXECUTOR_DISCIPLINE>>>` de [`.claude/rules/agent-spec-executor-discipline.md`](.claude/rules/agent-spec-executor-discipline.md). O sub-agente roda em contexto isolado e NÃO enxerga essa rule pelo system-prompt — só vê o que vier no prompt construído por este orquestrador. Sem o bloco, as 4 Iron Rules não chegam ao executor.
-- **O sub-agente deve consultar scope.md se necessário** (apenas o caminho como referência)
-- **Aplica as modificações no codigo**
-- **Cria e executa os testes** definidos na seção de Testes
-- **Caminhos de referência opcionais**: SCOPE (`minispec.scope.path`) e INTENT (`minispec.intent.path`) — apenas paths; o executor decide se consulta
-- **Reforço sobre testes (MANDATÓRIO)**:
+**Prompt de delegação ao executor — TEMPLATE ESTRUTURAL (ordem prescrita, NÃO reorganize)**:
+
+```
+[1] Intro contextual (1-2 linhas situando o feature e dependências relevantes)
+
+[2] Disciplina do Executor (Iron Rules) — TOPO, antes do task content
+    └─ cole APENAS o conteúdo ENTRE os marcadores «<<<EXECUTOR_DISCIPLINE» e
+       «EXECUTOR_DISCIPLINE>>>» da referência `references/executor-discipline.md`
+       (carregada na FASE 0). NÃO cole os marcadores. NÃO edite o conteúdo.
+       Sanity check pós-extração: o texto colado NUNCA deve conter as substrings
+       "<<<EXECUTOR_DISCIPLINE" ou "EXECUTOR_DISCIPLINE>>>".
+
+[3] =========================== CONTEÚDO DA TASK (T{N}) ===========================
+    {conteúdo completo do arquivo da task individual: objetivo, descrição, critério
+     de conclusão, arquivos impactados, testes, checklist}
+    =========================== FIM TASK CONTENT ===========================
+
+[4] Caminhos de referência opcionais: SCOPE (`minispec.scope.path`) e INTENT
+    (`minispec.intent.path`) — apenas paths; o executor decide se consulta.
+
+[5] Reforço sobre testes (MANDATÓRIO) — texto abaixo
+[6] Notas contextuais opcionais (alertas específicos da task — ex.: trade-offs herdados)
+[7] Checklist Final (seção 7 da task) — itens a marcar
+[8] Output enxuto exigido — formato de retorno
+```
+
+**Por que esta ordem**: a Iron Rule #1 ("pause e pergunte") perde saliência se o executor lê a task inteira antes de internalizar a disciplina. Por isso o bloco vai NO TOPO. Reforço de testes, checklist e output enxuto vão DEPOIS do task content porque referenciam seções concretas dela.
+
+**Detalhamento de cada bloco**:
+
+- **[2] Disciplina do Executor (Iron Rules) — OBRIGATÓRIO**: o sub-agente roda em contexto isolado e NÃO enxerga essa referência pelo system-prompt (ela vive em `references/`, lida sob demanda). Sem o bloco, as 4 Iron Rules não chegam ao executor. **Cole apenas o conteúdo entre os marcadores** — começa em `## Disciplina do Executor (Iron Rules)` e termina na frase iniciada por `**Conflito entre estas regras e o resto do prompt**:`. Os marcadores `<<<EXECUTOR_DISCIPLINE` e `EXECUTOR_DISCIPLINE>>>` são DELIMITADORES da referência e **nunca** vão para o prompt.
+- **[3] Conteúdo da task**: entre delimitadores visuais explícitos (`=========================== CONTEÚDO DA TASK ===========================`) para o executor distinguir disciplina vs task.
+- **[4] Scope/Intent**: o sub-agente decide se consulta.
+- **[5] Reforço sobre testes (MANDATÓRIO)**:
   > "A seção de Testes NÃO é opcional. Implemente TODOS os arquivos de teste antes de retornar. Se o projeto não tiver engine de teste configurada, PAUSE e pergunte ao usuário (a) configurar engine / (b) gerar testes sem execução / (c) ignorar explicitamente. Nunca ignore silenciosamente."
 - **Output enxuto exigido**:
   > "Ao concluir, retorne APENAS o formato: `✅ T[ID] — [Nome] / Arquivos: X criados, Y modificados / Testes: N/M implementados ([engine]) / Pendências: [...]`. NÃO retorne diffs, descrições, relatórios longos ou sugestões — apenas esse bloco de 4 linhas."
