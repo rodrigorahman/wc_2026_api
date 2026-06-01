@@ -1,5 +1,5 @@
 feature: "Esqueci a senha — recuperação de acesso por e-mail"
-current_step: tech_spec
+current_step: task_plan
 variant: backend
 source: "recommended"
 source_note: ""
@@ -14,8 +14,11 @@ steps:
     variant: backend
     summary: "Estende AuthService (RequestPasswordRecovery + ChangePassword) e Login (password_change_required); EmailSender/ResendSender/NoopSender; users +temp_password_hash/+temp_password_expires_at (migração 000009); 38 CTs."
   validation:
-    status: pending
+    status: skipped
   task_plan:
-    status: pending
+    status: completed
+    summary: "10 tasks, 4 fases, 6 paralelizáveis (T1-T4 + T8-T9). US cobertas: 8/8. 38 CTs do §19 redistribuídos heuristicamente + 19 CTs de infra (T3/T4) via QA generator."
   execution:
     status: pending
+    tasks_total: 10
+    tasks_completed: 0
