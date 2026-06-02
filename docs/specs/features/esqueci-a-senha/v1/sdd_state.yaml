@@ -1,5 +1,5 @@
 feature: "Esqueci a senha — recuperação de acesso por e-mail"
-current_step: task_plan
+current_step: execution
 variant: backend
 source: "recommended"
 source_note: ""
@@ -19,6 +19,7 @@ steps:
     status: completed
     summary: "10 tasks, 4 fases, 6 paralelizáveis (T1-T4 + T8-T9). US cobertas: 8/8. 38 CTs do §19 redistribuídos heuristicamente + 19 CTs de infra (T3/T4) via QA generator."
   execution:
-    status: pending
+    status: completed
     tasks_total: 10
-    tasks_completed: 0
+    tasks_completed: 10
+    summary: "10/10 tasks concluidas (gates aprovados). T3 reordenado para apos T5 (acoplamento da interface EmailSender). make test verde + make build-all (4 targets CGO off) verde. Retries: T1 (1, regressao de migracao cross-package), T3 (1, asserção tautológica + test-only em prod), T8 (1, setter de auth exportado test-only). Nenhuma task bloqueada."

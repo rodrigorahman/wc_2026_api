@@ -52,7 +52,7 @@ const (
 const msgRecoveryRequested = "Se o e-mail estiver cadastrado, enviaremos as instruções de recuperação."
 
 const (
-	recoveryEmailSubject = "Recuperação de acesso — Bolão Copa 2026"
+	recoveryEmailSubject = "Recuperação de acesso — Album Figurinhas da Copa do Mundo 2026"
 	recoveryEmailBody    = "Recebemos um pedido de recuperação de acesso.\n\n" +
 		"Sua senha temporária é: %s\n\n" +
 		"Ela é válida por 15 minutos. Use-a para entrar e troque sua senha em seguida.\n\n" +
@@ -65,7 +65,7 @@ const (
 const msgInvalidTempPassword = "senha temporária inválida ou expirada"
 
 const (
-	passwordChangedEmailSubject = "Sua senha foi alterada — Bolão Copa 2026"
+	passwordChangedEmailSubject = "Sua senha foi alterada — Album Figurinhas da Copa do Mundo 2026"
 	passwordChangedEmailBody    = "Sua senha de acesso foi alterada.\n\n" +
 		"Se foi você, nenhuma ação é necessária.\n\n" +
 		"Se você não reconhece esta alteração, redefina seu acesso imediatamente."

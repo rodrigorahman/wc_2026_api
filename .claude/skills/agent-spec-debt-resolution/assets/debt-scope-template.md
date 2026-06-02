@@ -68,7 +68,7 @@ _Nenhum débito ignorado — todos os coletados foram selecionados para cleanup.
 
 ### 3.4 Paralelização
 
-Tasks de débito são **independentes por construção** (cada uma toca seu próprio cenário). No `task_plan.md`, todas marcadas `Pode Rodar em Paralelo? = Sim`. O orquestrador `/agent-spec-minispec-run-tasks` aplicará seus 5 guards (paths disjuntos, sem dep transitiva textual, lote ≤ MAX_PARALLEL=4) — se houver colisão de paths entre 2 tasks de débito (mesmo arquivo tocado), faz fallback automático para sequencial.
+Tasks de débito são **independentes por construção** (cada uma toca seu próprio cenário). No `task_plan.md`, o flag `Pode Rodar em Paralelo?` é **derivado** (Regra 10d) — não autore `Sim` por padrão. O orquestrador `/agent-spec-minispec-run-tasks` **re-verifica** os guards (independência no DAG, disjunção de símbolo, paths disjuntos, sem arquivo de alta contenção compartilhado, lote ≤ MAX_PARALLEL=4) — se houver colisão de paths/símbolo/arquivo de registro entre 2 tasks de débito, faz fallback automático para sequencial.
 
 ---
 

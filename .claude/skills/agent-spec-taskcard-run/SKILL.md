@@ -253,6 +253,8 @@ Aplique durante TODA a execução:
    - **Fim do run (Passo 7)**: logue contagem total em `shared.qa_observations.path` (`[run] rule_candidates: N sinais persistidos...`). Se N == 0, nem crie o arquivo nem logue.
 
    **Falhas de append são não-bloqueantes** — nunca rejeite TaskCard por falha de instrumentação.
+
+5.3. **Detecção de cmux (progresso opcional, não-bloqueante)** — detecte UMA vez se o binário `cmux` existe e defina `cmux_progress_enabled`, conforme a seção **"Progresso no cmux"** de [`agent-spec-workflow-rules.md`](.claude/rules/agent-spec-workflow-rules.md). Para TaskCard, `tasks_total = 1` e `tasks_completed = 0` (o progresso usa sempre o numerador `1/1`). Se `cmux` ausente, `cmux_progress_enabled = false` e PULE silenciosamente toda emissão pelo resto do run.
 6. Leia a TaskCard completa no `taskcard_path`.
 7. **Parseie o frontmatter (seção 1 - Identificação)**: extraia `id`, `model`, `risk`, `gates`. (Ver "Lógica de Seleção de Modelo".)
 8. **Resolva `effective_model`** do executor (seções 2-3 da Lógica de Seleção).
@@ -261,6 +263,8 @@ Aplique durante TODA a execução:
 11. Valide seções 3-9 preenchidas e dependências satisfeitas (seção 1).
 
 ### Passo 2 — Executar
+
+**Progresso cmux (se `cmux_progress_enabled`)**: antes de invocar o executor, emita `1/1: {Nome da TaskCard}` — ver "Progresso no cmux" em `agent-spec-workflow-rules.md`.
 
 **Pré-verificação fast-path**:
 - `gates: none` → execute o executor, **PULE QA e Tech Review** (Passos 4 e 5), pule diretamente para Passo 5.5 (stage) e Passo 7 (relatório). Appende observação no `shared.qa_observations.path`: "TC-[id] executada sem gates".
@@ -372,6 +376,8 @@ Inclua:
 
 ### Passo 4.3 — Disparar o QA
 
+**Progresso cmux (se `cmux_progress_enabled`)**: antes de disparar o QA, emita `1/1: Validando QA` — ver "Progresso no cmux" em `agent-spec-workflow-rules.md`.
+
 Resolva `qa_model` (ver "Lógica de Seleção §4"):
 
 ```
@@ -467,6 +473,8 @@ Extraia do JSON completo do QA (preservado no Passo 4.3) **APENAS os campos** de
 > NÃO envie `problemas[]`, `criterios_falhos[]` nem o restante do JSON do QA no prompt do staff. O agente gera o diff por conta própria; o sumário cobre a metadata. O campo `escopo_declarado` vem da Camada 0 do QA (presença dos entregáveis declarados na TaskCard).
 
 ### Passo 5.3 — Disparar o Tech Review
+
+**Progresso cmux (se `cmux_progress_enabled`)**: antes de disparar o Tech Review, emita `1/1: Review Task` — ver "Progresso no cmux" em `agent-spec-workflow-rules.md`.
 
 Resolva `tech_model` (ver "Lógica de Seleção §4").
 
@@ -566,6 +574,7 @@ NÃO re-execute a suíte de testes salvo se o sumário do QA indicar `tocou_area
 2. **Stage real**: `git add -- <task_paths>` (substitui o `git add -N` do Passo 5.1 por adição definitiva).
 3. **NÃO commitar** — o usuário decide quando agrupar TaskCards num commit.
 4. **Logar**: registre uma linha curta no log: `TC-[ID] — staged: [lista de paths]`.
+5. **Progresso cmux (se `cmux_progress_enabled`)**: emita `cmux set-progress 1.0 --label "1/1: Concluído"` (não-bloqueante) — ver "Progresso no cmux" em `agent-spec-workflow-rules.md`.
 
 > **Por que stage real ao final**: a próxima TaskCard captura seu próprio `base_sha = git rev-parse HEAD` e gera `git diff <novo_base_sha> -- <novos_paths>`. Como o filtro é por path, TaskCards com paths disjuntos não se contaminam. Se houver overlap real (raro), o usuário precisa commitar entre elas para resetar o baseline.
 

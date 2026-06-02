@@ -114,6 +114,8 @@ Use **exclusivamente** os templates de `.claude/rules/agent-spec-minispec-workfl
    - **Fim do run**: logue contagem total em `shared.qa_observations.path` (`[run] rule_candidates: N sinais persistidos...`). Se N == 0, nem crie o arquivo nem logue.
 
    **Falhas de append são não-bloqueantes** — nunca rejeite task por falha de instrumentação.
+
+4.3. **Detecção de cmux (progresso opcional, não-bloqueante)** — detecte UMA vez se o binário `cmux` existe e defina `cmux_progress_enabled` + `tasks_total`, conforme a seção **"Progresso no cmux"** de [`agent-spec-workflow-rules.md`](.claude/rules/agent-spec-workflow-rules.md). Se ausente, `cmux_progress_enabled = false` e PULE silenciosamente toda emissão de progresso pelo resto do run. Inicialize `tasks_completed = 0`.
 5. Verifique git (uma única vez por execução):
    ```bash
    git rev-parse --is-inside-work-tree
@@ -142,25 +144,28 @@ Use **exclusivamente** os templates de `.claude/rules/agent-spec-minispec-workfl
    | ID | Nome | Fase | Dependências | Pode Rodar em Paralelo? | Status |
    |---|---|---|---|---|---|
 
-3. Construa o grafo: cada ID é nó, "Dependências" é lista de arestas.
-4. Identifique tasks prontas: Status `A Fazer` (ou vazio) E todas as dependências com Status `Concluído`.
-5. Extraia da seção 1 (Identificação) do `task_plan.md` os caminhos do **Intent** e **Scope** (campos explícitos). Em caso de ausência, use `minispec.intent.path` e `minispec.scope.path`.
+3. **Reconcilie dependências (fonte única)**: a seção 1 de cada `TN.md` é **autoritativa**. Compare `Dependencias` da tabela (seções 4 e 5 do `task_plan.md`) com a do `TN.md`; em divergência, use a **UNIÃO** e logue em `shared.qa_observations.path` (ver "Reconciliação de Dependências" em `agent-spec-workflow-rules.md`). Parsing tolerante (`—`/`Nenhuma`/vazio = sem deps; extraia IDs `T\d+`).
+4. **Ingira os campos de símbolo** de cada `TN.md` (seção 1): `Simbolos publicos criados` e `Simbolos consumidos de outras tasks` — insumo do guard de disjunção de símbolo (§2.0). Ausentes/`N/A` → "não provável" (não entra em lote paralelo por esse critério).
+5. Construa o grafo: cada ID é nó, dependências reconciliadas são arestas.
+6. Identifique tasks prontas: Status `A Fazer` (ou vazio) E todas as dependências com Status `Concluído`.
+7. Extraia da seção 1 (Identificação) do `task_plan.md` os caminhos do **Intent** e **Scope** (campos explícitos). Em caso de ausência, use `minispec.intent.path` e `minispec.scope.path`.
 
 ---
 
 ## FASE 2 — Execução por Fase (paralelismo declarado quando seguro)
 
-> **Comportamento**: o orquestrador HONRA a coluna "Pode Rodar em Paralelo?" do `task_plan.md` **com guards** definidos em [`agent-spec-workflow-rules.md`](.claude/rules/agent-spec-workflow-rules.md) → seção **"Execução Paralela de Tasks"**. Quando os guards falham (paths sobrepostos, dep transitiva textual, lote > MAX_PARALLEL=4), faz fallback automático para sequencial e loga o motivo.
+> **Comportamento**: o orquestrador **re-verifica** o flag derivado "Pode Rodar em Paralelo?" do `task_plan.md` **com guards** definidos em [`agent-spec-workflow-rules.md`](.claude/rules/agent-spec-workflow-rules.md) → seção **"Execução Paralela de Tasks"** — NÃO confia cego na coluna. Quando qualquer guard não prova independência (dependência no DAG, símbolo consumido criado por par do lote, paths sobrepostos, arquivo de alta contenção, lote > MAX_PARALLEL=4), faz fallback automático para sequencial e loga o motivo específico.
 
 ### 2.0 Detecção do Lote Paralelo (início de cada fase)
 
-Aplique o algoritmo da rule **"Execução Paralela de Tasks"**:
+Aplique o algoritmo da rule **"Execução Paralela de Tasks"** (re-verifique o flag derivado — NÃO confie cego na coluna):
 
 1. Selecione tasks com `Status: A Fazer` da fase atual.
 2. Candidatos paralelos: aquelas com `Pode Rodar em Paralelo? = Sim`.
-3. Aplique guards: paths disjuntos + sem dep transitiva textual + MAX_PARALLEL=4.
-4. Logue o lote final + motivos de exclusão.
+3. Aplique guards (qualquer um sem prova de independência → remova a task, sequencial): **independência no DAG** (sem ancestral/descendente no lote) + **disjunção de símbolo** (`consumidos(ti) ∩ criados(tj) = ∅`; remova o consumidor) + **paths disjuntos** (seções 3.1+3.2) + **arquivos de alta contenção** (container DI, router/registry, barrel, manifests, migrations) + **MAX_PARALLEL=4**.
+4. Logue o lote final + **motivo específico** de exclusão de cada removido (qual guard, qual símbolo/arquivo).
 5. **Capture `base_sha` UMA vez** antes do lote.
+5.1. **Progresso cmux (se `cmux_progress_enabled`)**: emita `{nums}/{total}: Executando Várias tasks em paralelo` (numerador = IDs do lote unidos por vírgula em ordem ascendente) — ver "Progresso no cmux" em `agent-spec-workflow-rules.md`.
 6. Despache **TODOS os executores do lote numa única mensagem** (múltiplos `Agent()` em paralelo).
 7. Aguarde TODOS retornarem.
 8. Crie execution summaries em paralelo.
@@ -186,6 +191,8 @@ Para cada task pronta restante (não-paralelizável) em ordem topológica, respe
 5. **Determine `task_gates`** (fast-path — ver [`references/config.md`](references/config.md) §5).
 
 ### 2.3 Delegar ao executor (agent_name)
+
+**Progresso cmux (se `cmux_progress_enabled`)**: antes de invocar o executor, emita `{id}/{total}: {Nome da task}` (numerador = ID numérico da task) — ver "Progresso no cmux" em `agent-spec-workflow-rules.md`.
 
 **Pré-verificação fast-path**:
 - `gates: none` → execute o executor, **PULE QA e Tech Review**, marque task como concluída, appende observação no `shared.qa_observations.path` e siga.
@@ -278,6 +285,8 @@ Esses 2 campos são **passados INLINE** no prompt do QA (FASE 3) e do Tech Revie
 >
 > **Pré-verificação**: se `gates: none` → não invoque QA. Se `gates: [qa]` ou `[qa, tech_review]` → siga.
 
+**Progresso cmux (se `cmux_progress_enabled`)**: antes de disparar o QA (passo 3.3 da referência), emita `{id}/{total}: Validando QA` — ver "Progresso no cmux" em `agent-spec-workflow-rules.md`.
+
 **Antes de iniciar esta fase, leia [`references/qa-validator-prompt.md`](references/qa-validator-prompt.md)** — contém os passos completos:
 - **3.1** Preparar `arquivos` para o QA (lista enxuta — base_sha + sumário do executor entram inline em `instrucoes`)
 - **3.2** Preparar `instrucoes` para o QA (critérios, testes, rastreabilidade CT-XX, comandos)
@@ -296,6 +305,8 @@ Esses 2 campos são **passados INLINE** no prompt do QA (FASE 3) e do Tech Revie
 > **Pré-verificação**: se `gates: [qa]` → PULE este gate; marque concluída após QA aprovar.
 >
 > O Tech Review **NÃO re-executa testes** salvo se: `tocou_area_critica: true` E `escopo_testes != "SUITE_COMPLETA"`, OU se detectar violação `critical` em `architecture`/`security`.
+
+**Progresso cmux (se `cmux_progress_enabled`)**: antes de disparar o Tech Review (passo 4.2 da referência), emita `{id}/{total}: Review Task` — ver "Progresso no cmux" em `agent-spec-workflow-rules.md`.
 
 **Antes de iniciar esta fase, leia [`references/staff-review-prompt.md`](references/staff-review-prompt.md)** — contém os passos completos:
 - **4.1** Preparar contexto: visibilidade git via `git add -N` (4.1.1), sumário mínimo do QA com `qa_summary_fields` (4.1.2), categorização NOVOS/MODIFICADOS (4.1.3).
@@ -323,11 +334,14 @@ Esses 2 campos são **passados INLINE** no prompt do QA (FASE 3) e do Tech Revie
    - Status `Concluído` no grafo de dependências (seção 5).
    - Se houver bloqueios, status `Bloqueado` + motivo.
 
-3. **Incremente `tasks_completed`** no `minispec_state.yaml`.
+3. **Incremente `tasks_completed`** no `minispec_state.yaml` (e na variável em memória usada pelo progresso cmux).
 
 4. **Cleanup de memória**: delete `T{N}.md` (memória lazy de retry) se foi criada (`cleanup_on_approval: true`).
 
 ### Após TODAS as tasks concluídas
+
+0. **Progresso cmux (se `cmux_progress_enabled`)**: emita `cmux set-progress 1.0 --label "{total}/{total}: Concluído"` (não-bloqueante) — ver "Progresso no cmux" em `agent-spec-workflow-rules.md`.
+
 
 1. **Critérios de Conclusão Geral** (seção 7 do `task_plan.md`): valide e marque `[x]` em cada:
    - [ ] Todas as tasks concluídas

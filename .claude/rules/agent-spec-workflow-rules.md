@@ -390,21 +390,73 @@ Para cada aplicação do algoritmo, o orquestrador DEVE persistir em `shared.qa_
 > Usada por `agent-spec-sdd-run-tasks` e `agent-spec-minispec-run-tasks` quando o `task_plan.md` marca tasks com `Pode Rodar em Paralelo? = Sim` na mesma fase. **NÃO se aplica a `agent-spec-taskcard-run`** — TaskCard é por definição 1 task por vez.
 >
 > **Motivação**: o post-mortem `cadastro-pratos-franquia` declarou T1+T2+T3+T4 paralelos no task_plan, mas o orquestrador ignorava a coluna. Rodaram sequenciais (~40min); em paralelo real seriam ~10min. Economia: ~30min por feature com fase paralela.
+>
+> **Correção de runs com conflito de ordem**: em várias execuções o flag `Pode Rodar em Paralelo?` foi **autorado por intuição** do gerador e os guards de execução eram **cegos a dependências de símbolo em arquivos ainda-não-criados** (o lote inclui tasks `A Criar`, então grep textual nunca acha o consumo). Resultado: tasks que dependiam entre si entravam no mesmo lote → conflito de ordem. As subseções abaixo tornam o paralelismo uma propriedade **derivada, conservadora e auditável**.
+
+### Invariante de Paralelismo (contrato canônico — fonte única)
+
+> Referenciado por geradores (`*-generate-task-plan` / `*-generate-tasks`, Regra 10d) e executores (`*-run-tasks`). É a definição única da semântica do flag.
+
+**Paralelismo é DERIVADO, nunca autorado.** O autor de tasks declara apenas as **arestas** (`Dependências`) e dois conjuntos de símbolos por task (`Símbolos públicos criados`, `Símbolos consumidos de outras tasks`). O flag `Pode Rodar em Paralelo?` é **computado** a partir desses dados. **Default em qualquer incerteza: `Não`.**
+
+Duas tasks `ti`, `tj` são **paralelo-seguras** se e somente se TODAS valem:
+
+1. **Mesma fase** (coluna `Fase`).
+2. **Independência no DAG**: nenhuma é ancestral nem descendente da outra (dependência direta OU transitiva) — calculado sobre o grafo de `Dependências`.
+3. **Disjunção de símbolo**: `símbolos_consumidos(ti) ∩ símbolos_criados(tj) = ∅` E vice-versa. (Substitui o antigo grep textual em arquivos inexistentes.)
+4. **Paths declarados disjuntos** (seções de arquivos a criar/modificar) — incluindo a lista de **arquivos de alta contenção** abaixo.
+5. **Nenhuma toca arquivo de alta contenção** em comum.
+
+Se qualquer condição não puder ser **provada**, o par NÃO é paralelo (conservador). Semântica do flag: "`Sim` = paralelizável com os demais pares prontos da mesma fase que também sejam paralelo-seguros entre si".
+
+### Arquivos de Alta Contenção (agnóstico de stack)
+
+> Arquivos de **registro compartilhado** que múltiplas tasks funcionais frequentemente tocam mesmo sem declarar (a Regra 6 manda absorver wire-up na task funcional — em lote paralelo isso converge no mesmo arquivo). Qualquer task que toque um desses é tratada como **sempre sobreposta** → força sequencial dentro da fase.
+
+| Categoria | Exemplos de match (qualquer stack) |
+|---|---|
+| **DI / container / registro** | `**/container*`, `**/wire_provider*`, `**/wire_gen*`, `**/di/**`, `**/providers*`, `**/injector*`, registro de bean/IoC |
+| **router / registry / menu** | `**/router*`, `**/routes*`, `**/routing*`, registro de endpoint, item de menu, tab, deeplink |
+| **barrel / public exports** | `**/index.ts`, `**/index.js`, `**/mod.rs`, `**/__init__.py`, `**/library.dart`, public API agregada |
+| **manifests / lockfiles** | `go.mod`, `go.sum`, `package.json`, `pyproject.toml`, `Cargo.toml`, `Cargo.lock`, `pubspec.yaml`, `pom.xml`, `build.gradle` |
+| **migrations ledger** | diretório `**/migrations/**` (a ordem/numeração é estado compartilhado, mesmo que arquivos sejam distintos) |
+
+> **Por que migrations entram aqui**: duas migrations "de arquivos distintos" compartilham a **ordem** (timestamp/sequência) — estado partilhado. Em paralelo geram colisão de numeração. Sequencial sempre.
+
+### Reconciliação de Dependências (fonte única)
+
+> O executor lê dependências de DOIS lugares (tabela do `task_plan.md` e seção 1 do `TN.md`). Eles podem divergir (RC de runs reais).
+
+- **Autoritativa**: `TN.md` seção 1 (`Dependências`, `Símbolos públicos criados`, `Símbolos consumidos de outras tasks`).
+- **Em divergência** entre `TN.md` e a tabela do `task_plan.md`: usar a **UNIÃO** das dependências (mais conservador) e registrar em `qa-observations.md`:
+  ```
+  [Fase N] reconciliação: T3 deps divergem (task_plan: [T1] | T3.md: [T1, T2]) → união [T1, T2]
+  ```
+- Parsing tolerante de texto livre: `—`, `-`, `Nenhuma`, `N/A`, vazio ⇒ sem dependências. `T1, T2` / `T1 e T2` / `T1; T2` ⇒ `{T1, T2}`. Texto não-parseável (ex.: `T1 (após migração)`) ⇒ extrair os IDs `T\d+` e logar o resíduo como observação.
 
 ### Condições para Paralelizar (TODAS obrigatórias)
 
-Um **lote paralelizável** de tasks é um subconjunto de tasks `prontas` (deps satisfeitas) que satisfaz:
+Um **lote paralelizável** é um subconjunto de tasks `prontas` (deps satisfeitas) em que **todo par** satisfaz o Invariante de Paralelismo acima. Operacionalmente:
 
 1. **Mesma fase** no task_plan.md (coluna `Fase`).
-2. **Todas marcadas `Pode Rodar em Paralelo? = Sim`**.
-3. **Paths disjuntos**: a união de paths impactados (seções de arquivos a criar/modificar de cada task) **não tem interseção** entre as tasks do lote. Calcule:
+2. **Todas com flag `Pode Rodar em Paralelo? = Sim`** (já derivado pelo gerador; o executor **re-verifica** — não confia cegamente).
+3. **Independência no DAG**: remova do lote qualquer task que seja ancestral/descendente (direta/transitiva) de outra do lote.
+4. **Disjunção de símbolo** (substitui o antigo grep textual): para cada par,
    ```
    for ti, tj in pairs(lote):
-       if (ti.paths ∩ tj.paths) != ∅:
-           remova ti e tj do lote; rode sequencial
+       if (ti.consumidos ∩ tj.criados) ≠ ∅ or (tj.consumidos ∩ ti.criados) ≠ ∅:
+           remova o CONSUMIDOR do lote (mantém o produtor); rode o consumidor depois
    ```
-4. **Sem dependência transitiva implícita**: se T2 modifica arquivo que T1 importa (mesmo que `Dependências` não declare), saída de T1 pode afetar build de T2. Heurística: se T1 cria símbolo público (função/tipo/classe) que T2 referencia textualmente nos arquivos da T2, **remova T2 do lote**.
-5. **Limite de paralelismo**: máximo `MAX_PARALLEL = 4` tasks por lote. Lotes maiores quebram em ondas de 4. Razão: tool limits do Claude Code + custo de coordenação cresce não-linearmente.
+   Se uma task declara consumir símbolo SEM apontar a task produtora, e algum par do lote o cria → conservador: remova o consumidor.
+5. **Paths disjuntos** (a criar/modificar) **+ arquivos de alta contenção**:
+   ```
+   for ti, tj in pairs(lote):
+       if (ti.paths ∩ tj.paths) ≠ ∅:                      remova ti e tj; sequencial
+       if ti.toca_alta_contencao and tj.toca_alta_contencao: remova ambas; sequencial
+   ```
+6. **Limite de paralelismo**: máximo `MAX_PARALLEL = 4` tasks por lote. Lotes maiores quebram em ondas de 4. Razão: tool limits do Claude Code + custo de coordenação cresce não-linearmente.
+
+> **Default conservador (inviolável)**: se QUALQUER guard não conseguir **provar** independência (dado ausente, símbolo sem origem, path ambíguo), a task cai para **sequencial**. Falso-sequencial custa minutos; falso-paralelo corrompe a ordem.
 
 ### Mecânica de Execução Paralela
 
@@ -429,10 +481,15 @@ Para cada task `ti` do lote:
 fase_atual = primeira_fase_com_tasks_prontas()
 tasks_fase = tasks de fase_atual com Status="A Fazer"
 
-# Detecta lote paralelizável
+# Reconcilia deps (TN.md autoritativa ∪ tabela); constrói DAG
+deps = reconcilia_deps(tasks_fase)        # ver "Reconciliação de Dependências"
+
+# Detecta lote paralelizável — re-verifica o flag derivado (não confia cego)
 candidatos = [t for t in tasks_fase if t.paralelo == "Sim"]
-lote = aplique_guards(candidatos)   # paths disjuntos + sem dep transitiva textual
+lote = aplique_guards(candidatos, deps)   # DAG independente + disjunção de símbolo
+                                          # + paths disjuntos + alta contenção
 lote = lote[:MAX_PARALLEL]
+# Qualquer guard sem prova de independência → task removida (sequencial)
 
 # Tasks fora do lote: sequenciais
 sequenciais = tasks_fase - lote
@@ -460,21 +517,79 @@ for ti in sequenciais: ...
 ### Log Obrigatório do Lote
 
 ```
-[Fase 1] lote paralelo: T1, T2, T3, T4 (paths disjuntos confirmados)
+[Fase 1] lote paralelo: T1, T2, T4 (DAG independente + símbolos disjuntos + paths disjuntos)
 [Fase 1] base_sha=abc1234
-[Fase 1] dispatch_parallel: 4 executores em paralelo
-[Fase 1] aprovados: T1, T2, T4 | em retry: T3 (QA: critical em CT-010)
-[Fase 1] staged sequencial: T1 → T2 → T4
+[Fase 1] dispatch_parallel: 3 executores em paralelo
+[Fase 1] aprovados: T1, T2 | em retry: T4 (QA: critical em CT-010)
+[Fase 1] staged sequencial: T1 → T2
 ```
 
 ### Fallback Automático para Sequencial
 
-Se QUALQUER guard falhar (paths sobrepostos, dep transitiva textual, lote > MAX_PARALLEL), o orquestrador faz **fallback determinístico para sequencial** e logra o motivo em `qa-observations.md`:
+Se QUALQUER guard não provar independência, o orquestrador remove a task do lote e faz **fallback determinístico para sequencial**, registrando o motivo **específico** em `qa-observations.md`:
 
 ```
+[Fase 1] T3 removida do lote: consome símbolo `service.EmailSender` criado por T2 (disjunção de símbolo)
+[Fase 1] T5 removida do lote: toca arquivo de alta contenção `internal/di/container.go` (compartilhado com T2)
 [Fase 1] paralelismo descartado: T2.paths ∩ T3.paths = ["internal/api/handlers/franchise_dish/wire_provider.go"]
+[Fase 1] reconciliação: T3 deps divergem (task_plan: [T1] | T3.md: [T1, T2]) → união [T1, T2]
 [Fase 1] fallback: sequencial T1 → T2 → T3 → T4
 ```
+
+---
+
+## Progresso no cmux (sidebar — opcional, não-bloqueante)
+
+> Usada por `agent-spec-sdd-run-tasks`, `agent-spec-minispec-run-tasks` e `agent-spec-taskcard-run`. Emite uma barra de progresso na sidebar do cmux refletindo a task em execução e a fase do pipeline. **Totalmente opcional**: só ativa se o binário `cmux` existir na máquina. **Nunca** bloqueia nem falha o run.
+
+### Gating — detecção única (na inicialização do run)
+
+No início do run (FASE 0 / Passo de Inicialização), detecte **UMA vez**:
+
+```bash
+command -v cmux >/dev/null 2>&1 && echo "cmux: on" || echo "cmux: off"
+```
+
+- **Presente** → `cmux_progress_enabled = true`.
+- **Ausente** → `cmux_progress_enabled = false`: **PULE silenciosamente** toda emissão de progresso pelo restante do run. NÃO logue, NÃO avise o usuário, NÃO tente nenhum comando `cmux`.
+
+Persista `cmux_progress_enabled` e `tasks_total` (total de tasks do plano; `1` no TaskCard) em memória do orquestrador para o run inteiro.
+
+### Emissão (helper) — sempre não-bloqueante
+
+Quando `cmux_progress_enabled == true`, em cada trigger point rode:
+
+```bash
+cmux set-progress <value> --label "<label>" 2>/dev/null || true
+```
+
+- `<value>` = `tasks_completed / tasks_total` (fração `0.0`–`1.0`; conta as tasks **já concluídas**, não a atual). No início = `0.0`; ao concluir todas = `1.0`.
+- `2>/dev/null || true` garante que qualquer falha (ex.: rodando fora de um workspace cmux, `$CMUX_WORKSPACE_ID` ausente) **nunca** interrompa o run. Falha de emissão é silenciosa e não-bloqueante.
+- A barra usa `$CMUX_WORKSPACE_ID` (workspace atual) por padrão — **não** passe `--workspace`.
+- Se `cmux_progress_enabled == false`, **não emita nada** (nem o `|| true`).
+
+### Catálogo de labels (formato fixo)
+
+`{num}` = numerador (ver abaixo); `{total}` = `tasks_total`.
+
+| Trigger point | Label |
+|---|---|
+| Início da execução de uma task (antes do executor) | `{num}/{total}: {Nome da task}` |
+| Antes de disparar o Gate 1 (QA) | `{num}/{total}: Validando QA` |
+| Antes de disparar o Gate 2 (Tech Review) | `{num}/{total}: Review Task` |
+| Lote paralelo (antes de despachar os executores do lote) | `{nums}/{total}: Executando Várias tasks em paralelo` |
+| Todas as tasks concluídas (fim do run) | `{total}/{total}: Concluído` (value `1.0`) |
+
+### Numerador (`{num}` / `{nums}`)
+
+- **Task sequencial** (SDD/miniSpec): o ID numérico da task (`T5` → `5`), com `{total}` = total de tasks do plano.
+- **TaskCard** (run de uma única card): sempre `1/1` — `{num}` = `1` e `{total}` = `1`, independentemente do ID da card (`TC-007` ainda emite `1/1: {Nome}`).
+- **Lote paralelo**: os IDs do lote unidos por vírgula, em ordem ascendente (`T5,T6,T7` → `5,6,7`).
+- O numerador identifica a(s) task(s) em foco; o **preenchimento da barra** (`value`) reflete `tasks_completed / tasks_total` independentemente do numerador.
+
+### Atualização de `tasks_completed`
+
+Incremente `tasks_completed` (variável em memória usada no `value`) no mesmo momento em que o `state.yaml` é incrementado — ao concluir AMBOS os gates de uma task. No lote paralelo, incremente por task aprovada+staged. A próxima emissão já reflete a nova fração.
 
 ---
 

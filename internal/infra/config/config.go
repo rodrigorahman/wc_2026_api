@@ -4,6 +4,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,9 +56,12 @@ func (c Config) IsDevelopment() bool {
 	return c.Env == "dev" || c.Env == "development"
 }
 
-// Load reads configuration from environment variables (and an optional config
-// file) via viper, applies sensible defaults, and enforces the fail-fast
-// security rule for JWT_SECRET.
+// Load reads configuration from an optional .env file in the working directory
+// plus environment variables via viper, applies sensible defaults, and enforces
+// the fail-fast security rule for JWT_SECRET. Process environment variables take
+// precedence over .env values, so production can override the file by exporting
+// real variables. A missing .env is not an error: the file is a developer
+// convenience, not a requirement.
 //
 // It returns an error — never calls os.Exit or log.Fatal — so that the caller
 // (composition root, T12) decides how to abort the fx OnStart lifecycle.
@@ -67,6 +71,16 @@ func Load() (Config, error) {
 	v.SetDefault("JWT_TTL", "1h")
 	v.SetDefault("GRPC_PORT", "50051")
 	v.SetDefault("APP_ENV", "production")
+
+	v.SetConfigName(".env")
+	v.SetConfigType("dotenv")
+	v.AddConfigPath(".")
+	if err := v.ReadInConfig(); err != nil {
+		var notFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &notFound) {
+			return Config{}, fmt.Errorf("ler arquivo .env: %w", err)
+		}
+	}
 
 	v.AutomaticEnv()
 

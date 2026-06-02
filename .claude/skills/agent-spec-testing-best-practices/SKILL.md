@@ -93,11 +93,11 @@ Padrões que sobrevivem a refactor. Aplicação em [references/padroes.md](refer
 
 ---
 
-## Famílias de antipadrões (28)
+## Famílias de antipadrões (29)
 
 Catálogo completo em [references/antipadroes.md](references/antipadroes.md). Resumo das famílias:
 
-- **Brittleness** (6) — testes que quebram em refactor inocente: seletores de implementação, assertions vagas, action sem assertion, snapshot-as-test, testar estrutura interna, testar método privado.
+- **Brittleness** (7) — testes que quebram em refactor inocente OU que não pegam regressão: seletores de implementação, assertions vagas, action sem assertion, snapshot-as-test, testar estrutura interna, testar método privado, **asserção tautológica/infalível (AP-29)**.
 - **Flakiness** (3) — `sleep`/timeout fixo, dependência de ordem, inputs não-determinísticos (`Date.now()`, RNG, locale).
 - **Mock misuse** (6) — **assertion em mock auto-setado** (mock-driven confidence), mock drift, over-mock de filhos, mock incompleto, mock em camada errada, **mock do próprio repository (AP-27)**.
 - **Process** (11) — coverage como vaidade, happy-path only, beforeAll eterno, cleanup em afterEach, magic strings, testar third-party, quarentena-cemitério, **retry-as-fix**, duplicação cross-layer, enfraquecer teste para passar, **duplicata semântica (AP-26)**, **fail-fast intestável (AP-28)**.

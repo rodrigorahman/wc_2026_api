@@ -10,6 +10,8 @@
 - **Status**: A Fazer | Em Progresso | Revisão | Concluído
 - **Fase**:
 - **Dependências**:
+- **Símbolos públicos criados**:        <!-- tipos/funções/interfaces/constantes que OUTRAS tasks podem consumir (ex.: `service.EmailSender`, `dto.CartItem`). N/A se nenhum. Alimenta a derivação do flag de paralelismo e o guard de disjunção de símbolo do executor (ver agent-spec-workflow-rules.md → "Invariante de Paralelismo"). -->
+- **Símbolos consumidos de outras tasks**: <!-- símbolo → task de origem (ex.: `service.EmailSender ← T5`). N/A se nenhum. Se consumir um símbolo nascido em task posterior, REORDENE (Regra 10a). -->
 - **User Stories Relacionadas**: (US-XX do PRD)
 
 ---

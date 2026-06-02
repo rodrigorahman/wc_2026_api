@@ -9,6 +9,8 @@
 - **Status**: A Fazer | Em Progresso | Revisao | Concluido
 - **Fase**:
 - **Dependencias**:
+- **Simbolos publicos criados**:        <!-- tipos/funcoes/interfaces/constantes que OUTRAS tasks podem consumir (ex.: `service.EmailSender`, `dto.CartItem`). N/A se nenhum. Alimenta a derivacao do flag de paralelismo e o guard de disjuncao de simbolo do executor (ver agent-spec-workflow-rules.md -> "Invariante de Paralelismo"). -->
+- **Simbolos consumidos de outras tasks**: <!-- simbolo -> task de origem (ex.: `service.EmailSender <- T5`). N/A se nenhum. Se consumir simbolo nascido em task posterior, REORDENE (Regra 10a). -->
 - **Criterio de Conclusao**: Como saber que esta pronta
 
 ---

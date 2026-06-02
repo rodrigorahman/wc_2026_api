@@ -29,7 +29,7 @@
 ### NÃO DEVE
 
 1. **NUNCA implementar** uma task diretamente — sempre delegue.
-2. **Tasks em paralelo são permitidas APENAS** quando passam nos guards da rule `agent-spec-workflow-rules.md` → "Execução Paralela de Tasks" (paths disjuntos + sem dep transitiva textual + lote ≤ MAX_PARALLEL=4). Falha em qualquer guard → fallback determinístico para sequencial.
+2. **Tasks em paralelo são permitidas APENAS** quando passam nos guards da rule `agent-spec-workflow-rules.md` → "Execução Paralela de Tasks" (independência no DAG + disjunção de símbolo + paths disjuntos + sem arquivo de alta contenção compartilhado + lote ≤ MAX_PARALLEL=4). Qualquer guard sem prova de independência → fallback determinístico para sequencial. O flag derivado é **re-verificado** — nunca confie cego na coluna.
 3. **NUNCA lance QA e Tech Review da MESMA task em paralelo**. Entre tasks de um lote paralelo, pipelines isolados PODEM rodar em paralelo (cada um QA→TR sequencial internamente).
 4. **NUNCA usar Haiku no executor** — rejeite com erro claro se frontmatter declarar.
 5. **Política débito-controlado em retry**: envie ao executor APENAS problemas com `severity` `critical` ou `high` como bloqueantes; problemas `medium`/`low` vão como "Observações" opcionais no mesmo prompt (não exigem correção no ciclo). Esses médios/baixos ficam registrados em `qa-observations.md` para cleanup futuro.

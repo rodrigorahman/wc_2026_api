@@ -132,6 +132,12 @@ Caminho feliz, teste negativo, fronteira, tratamento de erro, segurança, estado
         "input_invalido": "",
         "assertion_esperada": ""
       },
+      "precondicao_privilegiada": {
+        "presente": false,
+        "descricao": "",
+        "caminho_legitimo": "",
+        "teste_analogo": ""
+      },
       "camada": "",
       "pre_condicoes": [],
       "dados_entrada": { "descricao": "", "valores": {} },
@@ -174,6 +180,12 @@ Caminho feliz, teste negativo, fronteira, tratamento de erro, segurança, estado
 - `input_invalido`: descrição curta do input que distingue o negativo.
 - `assertion_esperada`: assertion específica (ex.: "422 + erro `total_invalido` no campo `erros[]`"). Vazio é proibido para Gate 7 cumprir o papel.
 
+**`precondicao_privilegiada`** (receita do seam — agnóstica de stack): preencha quando o caso de teste depende de uma precondição que a produção **não expõe publicamente** (contexto autenticado, estado interno, relógio/tempo, identidade/`sub`, sessão). Sem essa receita, o executor tende a alargar a superfície de produção para obter o seam (criar/exportar símbolo só para teste) — violação da Iron Law #6 e causa recorrente de reprovação.
+- `presente`: `true` se o caso exige tal precondição.
+- `descricao`: o que precisa estar montado antes do ato (ex.: "contexto carregando um `sub` autenticado").
+- `caminho_legitimo`: **como montá-la sem tocar a produção**, em ordem de preferência — (a) imitar teste análogo existente; (b) construir pelo caminho/API real do boundary; (c) mecanismo de teste-interno nativo da stack. **Nunca** instrua exportar/adicionar símbolo de produção só para teste. Descreva agnóstico (não nomeie mecanismo de uma linguagem específica salvo se a stack já estiver descoberta).
+- `teste_analogo`: caminho/identificador do teste existente que já monta essa precondição e deve ser imitado (ou `NENHUM` se não existir — então `caminho_legitimo` carrega a receita completa).
+
 **`mock_budget_observado`** (Gate 6 + Mock Budget Rule): `true` se a suíte respeita a regra — testes que mockam todos os colaboradores têm pelo menos 1 companheiro de integração; nenhuma assertion em valor que o próprio teste plantou no mock.
 
 **`gates_aplicados`**: lista os IDs dos gates aplicados nesta geração (todos os 7 devem aparecer em geração normal).
@@ -202,4 +214,5 @@ Caminho feliz, teste negativo, fronteira, tratamento de erro, segurança, estado
 8. **Mock Budget Rule**: nenhuma assertion em valor que o próprio teste plantou no mock; suítes 100% mockadas exigem companheiro de integração.
 9. **Descoberta de Stack — agnosticismo obrigatório**: nunca pressuponha linguagem/framework. Resolva pela precedência (rule `agent-spec-testing-stack.md` → CLAUDE.md/rules → sinais do código → lacuna sinalizada) e popule `stack_discovery`. Não invente framework; quando faltar, proponha o equivalente idiomático e marque `discovery_needed: true` com `lacunas[]`. Você nunca pergunta nada ao usuário (retorna só JSON) — o orquestrador recomendará `/agent-spec-testing-stack-bootstrap`.
 10. **Asserção concreta obrigatória** — `resultado_esperado` e `negative_companion.assertion_esperada` trazem valor exato, sentinela/tipo de erro ou código de status; **proibido** termo vago ("tratável", "correto", "válido", "não vazio", "funciona"). Faça auto-checagem antes de emitir o JSON e reescreva o que falhar.
-11. SEMPRE retorne JSON válido como resposta final.
+11. **Precondição privilegiada exige receita, não só asserção** — todo caso que dependa de estado que a produção não expõe publicamente (auth/contexto/relógio/identidade) DEVE preencher `precondicao_privilegiada` com o `caminho_legitimo` (imitar teste análogo → boundary real → mecanismo de teste-interno nativo) e, quando existir, o `teste_analogo` a imitar. **Nunca** descreva o seam como exportar/adicionar símbolo de produção. Dar o objetivo sem a receita é o que leva o executor a violar a Iron Law #6.
+12. SEMPRE retorne JSON válido como resposta final.

@@ -260,6 +260,16 @@ Validação de startup termina o processo inline (`log.Fatal`, `os.Exit`, `proce
 - **Gate question**: A regra de validação tem cobertura de teste? O teste exercita o caminho de erro (campo vazio → erro), ou só verifica que o valor passou através do construtor?
 - **Fix**: Extrair `ValidateXConfig(cfg) error` como função pura; o caller (construtor / `main`) chama `ValidateXConfig` e decide morrer com `logger.Error + os.Exit(1)`. Teste cobre `ValidateXConfig`. Ver padrão #14 em `padroes.md`.
 
+### AP-29 — `tautological_assertion`
+**Família**: Brittleness · **Severidade**: ALTO
+
+Asserção que **nunca pode falhar**, logo não detecta regressão: ramo sempre-verdadeiro numa disjunção (`assert(A || cond)` onde `cond` já está garantida por uma asserção anterior — ex.: `require.Error(err)` seguido de `assert.True(strings.Contains(msg, "[ERROR]") || err != nil)`, cuja 2ª cláusula é sempre verdadeira), `expect(true).toBe(true)`, comparação de um valor consigo mesmo, ou condição logicamente implicada pelo setup. Distinta de AP-05 (`vague_existence_assertion`): aqui a asserção é **infalível**, não apenas frouxa.
+
+- **Gate question**: Existe ALGUM estado do SUT — incluindo o bug que o teste deveria pegar — em que esta asserção falha? Se não existe, ela é decorativa (Iron Law #1).
+- **Fix**: Asserte o ramo específico que importa (a condição real), removendo a disjunção sempre-verdadeira. Se duas condições são alternativas legítimas, separe em casos/asserções distintos.
+
+> Severidade ALTO (bloqueia) **alinhada entre os dois gates**: tanto `agent-spec-qa-validator` (Camada 5) quanto `agent-spec-staff-architecture-review` classificam asserção tautológica como `high`/blocking — mascara regressão (Iron Law #1). Originou-se da divergência de rubrica no run `esqueci-a-senha` T3 (QA marcou MÉDIO via AP-05, Tech Review marcou high para o mesmo achado).
+
 ---
 
 ## Mapeamento severidade → política débito-controlado

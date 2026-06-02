@@ -1,4 +1,4 @@
-.PHONY: proto sqlc test build build-all
+.PHONY: proto sqlc test build build-all run-debug
 
 BINARY_NAME := wc2026_api
 CMD_PATH    := ./cmd/server
@@ -14,6 +14,9 @@ test:
 
 build:
 	CGO_ENABLED=0 go build -o bin/$(BINARY_NAME) $(CMD_PATH)
+
+run-debug:
+	CGO_ENABLED=0 go run $(CMD_PATH)
 
 build-all:
 	CGO_ENABLED=0 GOOS=linux   GOARCH=amd64 go build -o bin/$(BINARY_NAME)-linux-amd64   $(CMD_PATH)

@@ -47,8 +47,9 @@ Fase 1 (paralelo, respeitando guards do orquestrador):
   T1 ─┐
   T2 ─┤
   T3 ─┤  → orquestrador detecta lote paralelizável até MAX_PARALLEL=4
-  T4 ─┤    com guards de paths disjuntos e dep transitiva textual.
-  ... ┘    Falha em guard → fallback sequencial automático.
+  T4 ─┤    com guards de independência no DAG, disjunção de símbolo,
+  ... ┘    paths disjuntos e arquivos de alta contenção.
+           Falha em guard → fallback sequencial automático.
 ```
 
 ### Grafo de Dependências

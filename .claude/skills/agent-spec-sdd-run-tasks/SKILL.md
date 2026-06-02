@@ -253,6 +253,8 @@ Você sempre terá acesso a:
    - **Fim do run**: logue contagem total em `shared.qa_observations.path` (`[run] rule_candidates: N sinais persistidos...`). Se N == 0, nem crie o arquivo nem logue.
 
    **Falhas de append são não-bloqueantes** — nunca rejeite task por falha de instrumentação.
+
+4.3. **Detecção de cmux (progresso opcional, não-bloqueante)** — detecte UMA vez se o binário `cmux` existe e defina `cmux_progress_enabled` + `tasks_total`, conforme a seção **"Progresso no cmux"** de [`agent-spec-workflow-rules.md`](.claude/rules/agent-spec-workflow-rules.md). Se ausente, `cmux_progress_enabled = false` e PULE silenciosamente toda emissão de progresso pelo resto do run. Inicialize `tasks_completed = 0`.
 5. Atualize `sdd_state.yaml` (path via `sdd.state.path`):
    ```yaml
    current_step: execution
@@ -272,27 +274,32 @@ Você sempre terá acesso a:
    | ID | Nome | Fase | Dependências | Pode Rodar em Paralelo? | Status |
    |---|---|---|---|---|---|
 
-3. Construa o grafo: cada ID é nó, "Dependências" é lista de arestas.
-4. Identifique tasks prontas: Status `A Fazer` E todas as dependências com Status diferente de `A Fazer`.
+3. **Reconcilie dependências (fonte única)**: a seção 1 de cada `TN.md` é **autoritativa**. Para cada task, compare `Dependências` da tabela do `task_plan.md` com `Dependências` do `TN.md`; em divergência, use a **UNIÃO** (conservador) e logue em `shared.qa_observations.path` (ver "Reconciliação de Dependências" em `agent-spec-workflow-rules.md`). Aplique parsing tolerante de texto livre (`—`/`Nenhuma`/vazio = sem deps; extraia IDs `T\d+`).
+4. **Ingira os campos de símbolo** de cada `TN.md` (seção 1): `Símbolos públicos criados` e `Símbolos consumidos de outras tasks`. São insumo do guard de disjunção de símbolo (§3.0). Ausentes/`N/A` → trate como "não provável" (a task não entra em lote paralelo por esse critério).
+5. Construa o grafo: cada ID é nó, dependências reconciliadas são arestas.
+6. Identifique tasks prontas: Status `A Fazer` E todas as dependências com Status diferente de `A Fazer`.
 
-### 3. Execução por Fase (paralelismo declarado quando seguro)
+### 3. Execução por Fase (paralelismo derivado, re-verificado quando seguro)
 
-> **Comportamento**: o orquestrador HONRA a coluna "Pode Rodar em Paralelo?" do task_plan.md **com guards** definidos em [`agent-spec-workflow-rules.md`](.claude/rules/agent-spec-workflow-rules.md) → seção **"Execução Paralela de Tasks"**. Quando os guards falham (paths sobrepostos, dep transitiva textual, lote > MAX_PARALLEL=4), faz fallback automático para sequencial e loga o motivo.
+> **Comportamento**: o orquestrador **re-verifica** o flag derivado "Pode Rodar em Paralelo?" do task_plan.md **com guards** definidos em [`agent-spec-workflow-rules.md`](.claude/rules/agent-spec-workflow-rules.md) → seção **"Execução Paralela de Tasks"** — NÃO confia cego na coluna. Quando qualquer guard não prova independência (dependência no DAG, símbolo consumido criado por par do lote, paths sobrepostos, arquivo de alta contenção, lote > MAX_PARALLEL=4), faz fallback automático para sequencial e loga o motivo específico.
 >
 > **Por fase**: tasks são processadas em ondas por fase do task_plan. Dentro de cada fase, primeiro o lote paralelo (se houver) é executado em paralelo, depois as sequenciais da mesma fase.
 
 ### 3.0 Detecção do Lote Paralelo (início de cada fase)
 
-Aplique o algoritmo da rule **"Execução Paralela de Tasks"**:
+Aplique o algoritmo da rule **"Execução Paralela de Tasks"** (re-verifique o flag derivado — NÃO confie cego na coluna):
 
 1. Selecione tasks com `Status: A Fazer` da fase atual.
 2. Candidatos paralelos: aquelas com `Pode Rodar em Paralelo? = Sim`.
-3. Aplique guards:
+3. Aplique guards (qualquer um sem prova de independência → remova a task, sequencial):
+   - **Independência no DAG**: remova do lote qualquer task ancestral/descendente (direta/transitiva) de outra do lote (sobre o grafo reconciliado em §2).
+   - **Disjunção de símbolo** (substitui o grep textual): para cada par, se `consumidos(ti) ∩ criados(tj) ≠ ∅` (qualquer sentido), remova o **consumidor** do lote. Símbolo consumido sem origem declarada que algum par cria → remova o consumidor.
    - **Paths disjuntos**: união de seções 5.1+5.2 de cada task não pode interseccionar com a de outra do lote.
-   - **Sem dep transitiva textual**: se `T1` cria símbolo público que aparece literalmente em arquivos de `T2`, remova `T2` do lote.
+   - **Arquivos de alta contenção**: se duas tasks tocam arquivo da lista canônica (container DI, router/registry, barrel, manifests, diretório de migrations — ver rule), remova ambas do lote.
    - **MAX_PARALLEL = 4**: corte em ondas de 4 se lote maior.
-4. Logue o lote final + motivos de exclusão de cada removido.
+4. Logue o lote final + **motivo específico** de exclusão de cada removido (qual guard, qual símbolo/arquivo).
 5. **Capture `base_sha` UMA vez** antes do lote (todas as tasks do lote usam o mesmo).
+5.1. **Progresso cmux (se `cmux_progress_enabled`)**: emita `{nums}/{total}: Executando Várias tasks em paralelo` (numerador = IDs do lote unidos por vírgula em ordem ascendente) — ver "Progresso no cmux" em `agent-spec-workflow-rules.md`.
 6. Despache **TODOS os executores do lote numa única mensagem** (múltiplos `Agent()` em paralelo).
 7. Aguarde TODOS retornarem antes de prosseguir.
 8. Crie execution summaries em paralelo (após cada executor respectivo).
@@ -318,6 +325,8 @@ Para cada task pronta restante (não-paralelizável) em ordem topológica:
 5. **Determine `task_gates`** (fast-path).
 
 #### 3.3 Delegar ao executor (agent_name)
+
+**Progresso cmux (se `cmux_progress_enabled`)**: antes de invocar o executor, emita `{id}/{total}: {Nome da task}` (numerador = ID numérico da task) — ver "Progresso no cmux" em `agent-spec-workflow-rules.md`.
 
 **Pré-verificação fast-path**:
 - `gates: none` → execute o executor, **PULE QA e Tech Review**, marque task como concluída, appende observação no `shared.qa_observations.path` e siga.
@@ -442,6 +451,8 @@ Inclua:
 8. **Economia de Leitura**: "Não leia arquivos desnecessários ao escopo desta task."
 
 ### Passo 3 — Disparar o QA
+
+**Progresso cmux (se `cmux_progress_enabled`)**: antes de disparar o QA, emita `{id}/{total}: Validando QA` — ver "Progresso no cmux" em `agent-spec-workflow-rules.md`.
 
 Resolva `qa_model` (ver "Lógica de Seleção de Modelo" §4):
 
@@ -624,6 +635,8 @@ NÃO execute `git diff` para categorizar — a categorização vem da task.
 
 ### Passo 7 — Disparar o Tech Review
 
+**Progresso cmux (se `cmux_progress_enabled`)**: antes de disparar o Tech Review, emita `{id}/{total}: Review Task` — ver "Progresso no cmux" em `agent-spec-workflow-rules.md`.
+
 Resolva `tech_model` (ver "Lógica de Seleção §4").
 
 ```
@@ -804,11 +817,14 @@ Se após 3 tentativas totais o QA ou Tech Review ainda reprovar:
    - Status `Concluído` na tabela de tasks.
    - Se houver bloqueios, status `Bloqueado` + motivo.
 
-3. **Incremente `tasks_completed`** no `sdd_state.yaml`.
+3. **Incremente `tasks_completed`** no `sdd_state.yaml` (e na variável em memória usada pelo progresso cmux).
 
 4. **Cleanup de memória**: delete `T{N}.md` (memória lazy de retry) se foi criada (`cleanup_on_approval: true`).
 
 ### Após TODAS as tasks concluídas
+
+0. **Progresso cmux (se `cmux_progress_enabled`)**: emita `cmux set-progress 1.0 --label "{total}/{total}: Concluído"` (não-bloqueante) — ver "Progresso no cmux" em `agent-spec-workflow-rules.md`.
+
 
 1. **Critérios de Conclusão Geral** (seção 7 do task_plan.md): valide e marque `[x]` em cada:
    - [ ] Todas as tasks concluídas
@@ -882,7 +898,7 @@ Aplique durante TODA a execução:
 ### NÃO DEVE
 
 1. **NUNCA implementar** uma task diretamente — sempre delegue.
-2. **Tasks em paralelo são permitidas APENAS quando** todos os guards de [`agent-spec-workflow-rules.md`](.claude/rules/agent-spec-workflow-rules.md) → "Execução Paralela de Tasks" passam (paths disjuntos, sem dep transitiva textual, lote ≤ MAX_PARALLEL=4). Caso contrário, fallback determinístico para sequencial.
+2. **Tasks em paralelo são permitidas APENAS quando** todos os guards de [`agent-spec-workflow-rules.md`](.claude/rules/agent-spec-workflow-rules.md) → "Execução Paralela de Tasks" passam (independência no DAG, disjunção de símbolo, paths disjuntos, sem arquivo de alta contenção compartilhado, lote ≤ MAX_PARALLEL=4). Qualquer guard sem prova de independência → fallback determinístico para sequencial.
 3. **NUNCA lançar QA e Tech Review em paralelo PARA A MESMA TASK**. Entre tasks diferentes do mesmo lote, pipelines isolados PODEM rodar em paralelo (cada um QA→TR sequencial internamente).
 4. **NUNCA usar Haiku no executor** — rejeite com erro claro se frontmatter declarar.
 5. **Política débito-controlado em retry**: envie ao executor APENAS problemas com `severity` `critical` ou `high` como bloqueantes; problemas `medium`/`low` vão como "Observações" opcionais no mesmo prompt (não exigem correção no ciclo). Esses médios/baixos ficam registrados em `qa-observations.md` para cleanup futuro.

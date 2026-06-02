@@ -16,7 +16,7 @@
 > **Como copiar (atenção)**:
 > 1. Os marcadores `<<<EXECUTOR_DISCIPLINE` e `EXECUTOR_DISCIPLINE>>>` são DELIMITADORES desta referência — **NÃO** vão para o prompt do executor.
 > 2. Copie apenas o **conteúdo entre os marcadores** (começa em `## Disciplina do Executor (Iron Rules)` e termina na frase que começa com `**Conflito entre estas regras e o resto do prompt**:`).
-> 3. Cole esse conteúdo **verbatim**, sem editar por task. Se precisar de reforço específico da stack (ex.: convenção de naming), adicione em outra seção do prompt — não dentro do bloco.
+> 3. Cole esse conteúdo **verbatim e íntegro**, sem editar por task. **Comprimir, resumir ou parafrasear o bloco é defeito** — dilui a saliência e já causou reincidência de reprovação (a Lei do seam, na Regra 5, é a primeira a se perder quando a disciplina é encurtada). Não reescreva as regras "em uma linha" nem as adapte ao contexto da task. Se precisar de reforço específico da stack ou da task (ex.: convenção de naming, alerta de blast radius), adicione em **outra seção** do prompt — nunca dentro do bloco nem no lugar dele.
 > 4. **Posicionamento no prompt do executor**: o bloco vai NO TOPO, antes do conteúdo da task. Razão: a Iron Rule #1 ("pause e pergunte") perde saliência se o executor lê a task inteira antes de internalizar a disciplina. Karpathy filosofia: disciplina precede contexto.
 
 <<<EXECUTOR_DISCIPLINE
@@ -60,6 +60,7 @@ Toda linha alterada deve rastrear de volta a um item da task. Se você não cons
 - **Modifique APENAS arquivos listados** nas seções de impacto da task + arquivos de teste declarados.
 - **Dead code preexistente NÃO é seu escopo.** Não remova, não renomeie, não "limpe". Se notar algo gritante, registre em "Pendências".
 - **Você PODE (e DEVE) remover símbolos que SUAS mudanças tornaram órfãos** — uma função que só era chamada pela versão antiga do código que você reescreveu, por exemplo. Apenas isso.
+- **Mudança de assinatura arrasta seus dependentes — isso NÃO é desvio de escopo.** Se você alterou a assinatura de um símbolo público (novo parâmetro obrigatório, mudança de retorno), tocar os callers/composition root/testes que instanciam para o build/contrato voltar a compilar é "limpar a própria bagunça", não expansão de escopo. Faça cirúrgico e registre em "Pendências". Se a task já lista esses dependentes, siga-a; se não, e o conjunto for além do trivial, **pause e pergunte** (Regra 1).
 
 ### 4. Execução orientada a objetivo
 
@@ -87,8 +88,9 @@ A asserção definida na seção de Testes é **contrato literal** — implement
 - **Não asserte o que o mock plantou.** Programar o dublê para retornar X e então asserir `== X` sem o SUT transformar X é teste oco (mock-driven confidence). Se mockou todos os colaboradores, entregue também o teste de integração que a spec pediu.
 - **Toda ação tem asserção.** Teste que executa e não verifica resultado observável (retorno, estado ou side-effect) não conta como teste.
 - **Falha = corrija o SUT, não o teste.** Se um teste falha, investigue o código de produção primeiro. Só altere o teste com uma linha `SUT_IS_CORRECT_BECAUSE: <motivo>` justificando por que o teste estava errado.
+- **Nenhum símbolo test-only em produção (Iron Law #6) — e como obter o seam sem violá-la.** Precisa de uma precondição ou ponto de injeção que a produção não expõe publicamente (contexto autenticado, estado interno, relógio, identidade)? **NÃO alargue a superfície pública de produção para obtê-lo.** Em ordem de preferência: **(a)** localize um teste análogo já existente que monta essa precondição e **imite-o exatamente**; **(b)** construa pela API/caminho **real** do boundary; **(c)** use o mecanismo de teste-interno **nativo da stack** que não altera a superfície de produção. **NUNCA** crie/exporte/adicione um símbolo de produção apenas para teste — proibição reforçada em arquivos de auth/security/crypto, onde um seam exposto torna o estado forjável. Se você se pegar editando um arquivo de produção só para o teste enxergar algo, pare: isso é a Regra 1 (mexer fora do escopo → pause) somada à Iron Law #6.
 
-Estas regras espelham a doutrina `agent-spec-testing-best-practices` (fonte única) — são exatamente os gates que o QA aplica para reprovar. Escreva certo na primeira passada, não no retry.
+Estas regras espelham a doutrina `agent-spec-testing-best-practices` (fonte única — **as seis Iron Laws, incluindo a #6 acima**) — são exatamente os gates que o QA aplica para reprovar. Escreva certo na primeira passada, não no retry.
 
 ---
 

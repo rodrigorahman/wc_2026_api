@@ -54,6 +54,22 @@
         "Cada arquivo TN.md contém '## 5. Arquivos Impactados' com as subseções 5.1, 5.2 e 5.3",
         "O task_plan.md contém tabela de rastreabilidade User Stories com mapeamento de pelo menos US-01 a US-09"
       ]
+    },
+    {
+      "id": 3,
+      "name": "paralelismo-derivado-e-coerente",
+      "prompt": "Gere o TASK PLAN completo para o carrinho de compras (tech_spec em docs/specs/features/carrinho-eval-0/v1/tech_spec.md). Aceite todas as fases sugeridas. Quero verificar especificamente a derivação do flag de paralelismo (Regra 10d): ele deve ser COMPUTADO a partir das dependências e dos símbolos criados/consumidos, nunca autorado por intuição, e deve respeitar o Invariante de Paralelismo.",
+      "expected_output": "A skill deve preencher 'Símbolos públicos criados' e 'Símbolos consumidos de outras tasks' na seção 1 de cada TN.md (ou N/A), e derivar a coluna 'Pode Rodar em Paralelo?' do task_plan.md aplicando o Invariante de Paralelismo de agent-spec-workflow-rules.md. Nenhuma task marcada 'Sim' pode depender (direta ou transitivamente) de outra task da MESMA fase. Default na incerteza: Não.",
+      "files": [
+        "docs/specs/features/carrinho-eval-0/v1/tech_spec.md"
+      ],
+      "expectations": [
+        "Cada arquivo TN.md contém na seção 1 os campos 'Símbolos públicos criados' e 'Símbolos consumidos de outras tasks' (preenchidos com símbolos concretos ou 'N/A')",
+        "Nenhuma task marcada 'Pode Rodar em Paralelo? = Sim' na tabela do task_plan.md tem, na coluna Dependências, outra task da MESMA Fase (invariante flag↔deps)",
+        "Se alguma task consome um símbolo criado por outra task da mesma fase, a task consumidora NÃO está marcada como paralela (Sim) — ou foi reordenada para fase posterior",
+        "A coluna de paralelismo do task_plan.md está anotada como derivada (cabeçalho contém 'derivado') e não há tasks marcadas 'Sim' que toquem o mesmo arquivo de registro compartilhado (container DI, router, barrel, manifest, migrations)",
+        "Para cada par de tasks marcadas 'Sim' na mesma fase, a união de arquivos das seções 5.1+5.2 de uma não intersecciona com a da outra (paths disjuntos)"
+      ]
     }
   ]
 }

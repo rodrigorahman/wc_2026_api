@@ -429,6 +429,22 @@ A Seção 5 (Testes) gerada pelo `agent-spec-qa-test-generator` **NÃO** é opci
   - **(c)** Ignorar os testes DESTA task explicitamente (requer confirmação do usuário, registrado em observações da task).
 - O QA no gate REJEITA se testes exigidos não foram implementados.
 
+### Regra 10 — Coerência de dependências e escopo (BLOQUEANTE)
+
+Antes de fixar a ordem das tasks e salvar o `task_plan.md`, valide três direções que historicamente forçam reorder ou desvio de escopo na execução. Agnóstico de stack.
+
+- **10a — Direção de dependência de símbolos.** Nenhuma task pode referenciar — nem em assertion de teste, nem em compile-time assertion — um símbolo (tipo, função, interface, constante) cujo **nascimento** está numa task **posterior**. Para cada símbolo citado por uma task, verifique em qual task ele é criado: se for posterior, **mova a referência** para a task que cria o símbolo OU declare a dependência explícita e **reordene**. _(Run `esqueci-a-senha`: T3 referenciava `service.EmailSender`, nascida em T5 → reorder forçado em execução.)_ **PERSISTA o resultado**: preencha `Simbolos publicos criados` e `Simbolos consumidos de outras tasks` (símbolo → task de origem) na seção 1 de cada `TN.md`. Esses campos não são opcionais — alimentam a derivação do flag (10d) e o guard de disjunção de símbolo do executor. Sem eles, o executor não consegue provar independência e cai para sequencial.
+- **10b — Blast radius além dos arquivos tocados.** Quando a mudança de uma task afeta estado/contrato **compartilhado** além dos arquivos que ela edita (estado global, contrato/schema em camada compartilhada, testes acoplados a ordem/profundidade de uma pilha), liste os **dependentes afetados** em §3.2 — ou uma nota autorizando tocá-los — e registre que a validação roda no **escopo do blast radius**, não só no módulo local. Vale para qualquer estado partilhado (migração no topo de uma pilha, contrato versionado, store global de front).
+- **10c — Mudança de assinatura arrasta dependentes.** Quando uma task altera a assinatura de um símbolo público (novo parâmetro obrigatório em construtor/função, mudança de retorno), **inclua em §3.2 os dependentes mecanicamente forçados** (composition root, callers, testes que instanciam) ou uma nota autorizando tocá-los. Tocá-los para o contrato/build permanecer válido é "limpar a própria bagunça", não expansão de escopo — evita falso-positivo de `scope_deviation` no gate.
+
+- **10d — Derivação do flag de paralelismo (NÃO autore por intuição).** A coluna `Pode Rodar em Paralelo?` do `task_plan.md` (seção 4 e grafo da seção 5) é **computada**, não adivinhada. Aplique o **"Invariante de Paralelismo"** de `.claude/rules/agent-spec-workflow-rules.md`. Para cada par de tasks da **mesma fase**, marque ambas `Sim` **somente se** TODAS valerem; caso contrário ambas (ou a consumidora) recebem `Não`:
+  1. **Independência no DAG** — nenhuma é ancestral/descendente da outra (deps diretas ou transitivas).
+  2. **Disjunção de símbolo** — `consumidos(ti) ∩ criados(tj) = ∅` nos dois sentidos (use os campos preenchidos em 10a).
+  3. **Paths declarados disjuntos** — seções 3.1+3.2 sem interseção.
+  4. **Nenhuma toca arquivo de alta contenção** em comum (container DI, router/registry, barrel, manifests, diretório de migrations — ver lista canônica na rule).
+
+  **Default em qualquer incerteza: `Não`** (falso-sequencial custa minutos; falso-paralelo corrompe a ordem de execução). As colunas das seções 4 e 5 ficam com a anotação "(derivado)" e devem ser **idênticas entre si**. Uma task que depende de outra da **mesma fase** **nunca** sai `Sim`.
+
 ---
 
 ## FASE 5 — Salvar Arquivos (OBRIGATÓRIO antes de apresentar)
@@ -557,7 +573,9 @@ docs/
 - [ ] `model`, `risk`, `gates` preenchidos no frontmatter de cada task
 - [ ] Regras de Decomposição 1-9 aplicadas (sem fragmentação excessiva e sem agregação ≥ 3 contratos + handler)
 - [ ] Dependências entre tasks mapeadas e coerentes
-- [ ] Paralelismo identificado corretamente
+- [ ] `Simbolos publicos criados` / `Simbolos consumidos de outras tasks` preenchidos em cada `TN.md` (Regra 10a)
+- [ ] Flag `Pode Rodar em Paralelo?` **derivado** do DAG + símbolos (Regra 10d) — não autorado por intuição
+- [ ] Invariante satisfeito: nenhuma task `Sim` depende (direta/transitiva) de outra da mesma fase; colunas das seções 4 e 5 idênticas
 - [ ] **TODOS** os arquivos envolvidos listados em cada task com ação (criar/modificar/referência)
 - [ ] `qa_context.md` extraído (se feature ≥ 3k tokens)
 - [ ] Seção 5 (Testes) preenchida em cada task via `agent-spec-qa-test-generator` (delegação obrigatória)

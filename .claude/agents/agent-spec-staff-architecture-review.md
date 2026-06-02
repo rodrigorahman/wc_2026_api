@@ -232,6 +232,7 @@ Você gera os diffs por arquivo via Bash (ver "FLUXO DE DIFF"). O **output do `g
 - Sem antipatrões: tautológicos, só validam mocks, validam detalhes de implementação, `expect(true).toBe(true)`, testes comentados, `only`/`focus` esquecidos
 - **Frontend/mobile**: testes de componente/widget validam comportamento do usuário (query por role/label, interações reais), não estado interno
 - Severidades: `high` se asserções fracas comprometem detecção de regressões; `medium` para padrões/determinismo; `low` para melhorias.
+  - **Asserção tautológica/infalível (AP-29)** — assertion que nunca pode falhar (ramo sempre-verdadeiro numa disjunção, `expect(true).toBe(true)`, valor comparado consigo mesmo) é sempre **`high`/blocking**, nunca `medium`: mascara regressão. Rubrica **alinhada com o `agent-spec-qa-validator` (Camada 5)** — o mesmo achado tem severidade única nos dois gates.
 
 ### Tratamento de Erros
 - Erros tratados e propagados conforme padrão do projeto

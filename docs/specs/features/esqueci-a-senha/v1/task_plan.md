@@ -4,7 +4,7 @@
 - **Feature/Projeto**: Esqueci a senha — recuperação de acesso por e-mail
 - **Responsável (Tech Lead)**: Rodrigo Rahman
 - **Data**: 2026-05-31
-- **Status**: Rascunho
+- **Status**: Concluído
 - **TECH_SPEC**: `docs/specs/features/esqueci-a-senha/v1/tech_spec.md`
 - **PRD**: `docs/specs/features/esqueci-a-senha/v1/prd.md`
 
@@ -34,16 +34,16 @@ Implementar a recuperação de acesso por **senha temporária** estendendo o dom
 ## 4. Lista de Tasks (visão macro)
 | ID  | Nome da Task | Arquivo | Fase | Dependências | Pode Rodar em Paralelo? | Status |
 | --- | ------------ | ------- | ---- | ------------ | ----------------------- | ------ |
-| T1  | Persistência — migração 000009, queries sqlc e repository | [T1](tasks/T1.md) | 1 | — | Sim | A Fazer |
-| T2  | Contrato proto — RPCs + password_change_required | [T2](tasks/T2.md) | 1 | — | Sim | A Fazer |
-| T3  | Capacidade de e-mail — ResendSender/NoopSender | [T3](tasks/T3.md) | 1 | — | Sim | A Fazer |
-| T4  | Config — secrets do Resend (fail-fast condicional) | [T4](tasks/T4.md) | 1 | — | Sim | A Fazer |
-| T5  | AuthService — base + RequestPasswordRecovery/processRecovery | [T5](tasks/T5.md) | 2 | T1 | Não | A Fazer |
-| T6  | AuthService.Login — 2º branch da temp + password_change_required | [T6](tasks/T6.md) | 2 | T5 | Não | A Fazer |
-| T7  | AuthService.ChangePassword — troca validada + notificação | [T7](tasks/T7.md) | 2 | T5 | Não | A Fazer |
-| T8  | AuthHandler — mappers dos 2 RPCs + campo no Login | [T8](tasks/T8.md) | 3 | T2, T5, T6, T7 | Sim | A Fazer |
-| T9  | Wiring — bind EmailSender, propagação temp no adapter, public method | [T9](tasks/T9.md) | 3 | T1, T2, T3, T4, T5 | Sim | A Fazer |
-| T10 | E2E — extensão do bufconn e fluxos ponta-a-ponta | [T10](tasks/T10.md) | 4 | T8, T9 | Não | A Fazer |
+| T1  | Persistência — migração 000009, queries sqlc e repository | [T1](tasks/T1.md) | 1 | — | Sim | Concluído |
+| T2  | Contrato proto — RPCs + password_change_required | [T2](tasks/T2.md) | 1 | — | Sim | Concluído |
+| T3  | Capacidade de e-mail — ResendSender/NoopSender | [T3](tasks/T3.md) | 1 | — | Sim (reordenado: após T5) | Concluído |
+| T4  | Config — secrets do Resend (fail-fast condicional) | [T4](tasks/T4.md) | 1 | — | Sim | Concluído |
+| T5  | AuthService — base + RequestPasswordRecovery/processRecovery | [T5](tasks/T5.md) | 2 | T1 | Não | Concluído |
+| T6  | AuthService.Login — 2º branch da temp + password_change_required | [T6](tasks/T6.md) | 2 | T5 | Não | Concluído |
+| T7  | AuthService.ChangePassword — troca validada + notificação | [T7](tasks/T7.md) | 2 | T5 | Não | Concluído |
+| T8  | AuthHandler — mappers dos 2 RPCs + campo no Login | [T8](tasks/T8.md) | 3 | T2, T5, T6, T7 | Sim | Concluído |
+| T9  | Wiring — bind EmailSender, propagação temp no adapter, public method | [T9](tasks/T9.md) | 3 | T1, T2, T3, T4, T5 | Sim | Concluído |
+| T10 | E2E — extensão do bufconn e fluxos ponta-a-ponta | [T10](tasks/T10.md) | 4 | T8, T9 | Não | Concluído |
 
 > **Lote paralelo Fase 1**: T1, T2, T3, T4 — paths disjuntos confirmados (db+repo / proto+gen / infra/email / config). 4 tasks = `MAX_PARALLEL`.
 > **Fase 2 sequencial**: T5 → T6 → T7 (todas tocam `service/auth_service.go` e seu `_test.go`).
@@ -55,14 +55,14 @@ Implementar a recuperação de acesso por **senha temporária** estendendo o dom
 
 | User Story (PRD) | Definição Técnica (SPEC) | Tasks Relacionadas | Status |
 | ---------------- | ------------------------ | ------------------ | ------ |
-| US-01 | `RequestPasswordRecovery` público + resposta genérica | T1, T2, T5, T8, T9, T10 | A Fazer |
-| US-02 | `processRecovery` gera temp e envia via `EmailSender` | T3, T4, T5, T9 | A Fazer |
-| US-03 | `password_change_required=true` no `LoginResponse` | T2, T6, T8, T10 | A Fazer |
-| US-04 | `ChangePassword` → `UpdatePassword` (zera temp) | T2, T7, T8, T10 | A Fazer |
-| US-05 | Resposta genérica + dispatch assíncrono (anti-enumeração) | T5, T8, T10 | A Fazer |
-| US-06 | Expiração 15 min via `clock.Now().Before(expires_at)` | T1, T6 | A Fazer |
-| US-07 | 2º branch (temp) no Login; original sempre válida | T6, T9, T10 | A Fazer |
-| US-08 | E-mail de notificação best-effort em `ChangePassword` | T3, T7 | A Fazer |
+| US-01 | `RequestPasswordRecovery` público + resposta genérica | T1, T2, T5, T8, T9, T10 | Concluído |
+| US-02 | `processRecovery` gera temp e envia via `EmailSender` | T3, T4, T5, T9 | Concluído |
+| US-03 | `password_change_required=true` no `LoginResponse` | T2, T6, T8, T10 | Concluído |
+| US-04 | `ChangePassword` → `UpdatePassword` (zera temp) | T2, T7, T8, T10 | Concluído |
+| US-05 | Resposta genérica + dispatch assíncrono (anti-enumeração) | T5, T8, T10 | Concluído |
+| US-06 | Expiração 15 min via `clock.Now().Before(expires_at)` | T1, T6 | Concluído |
+| US-07 | 2º branch (temp) no Login; original sempre válida | T6, T9, T10 | Concluído |
+| US-08 | E-mail de notificação best-effort em `ChangePassword` | T3, T7 | Concluído |
 
 > Todas as 8 User Stories cobertas. Regras transversais: CA-08 (gatilho só pós-recovery) em T6/T1; CA-09 (não logar senha) em T3/T5/T7.
 
@@ -78,12 +78,12 @@ Implementar a recuperação de acesso por **senha temporária** estendendo o dom
 
 ## 7. Critérios de Conclusão da Feature
 A feature será considerada concluída quando:
-- [ ] Todas as 10 tasks estiverem completas e gates aprovados.
-- [ ] Os 38 CTs do tech_spec §19 (+ CTs de infra T3/T4) validados (`make test` verde).
-- [ ] `make build-all` (4 targets, CGO off) verde.
-- [ ] Critérios técnicos do SPEC atendidos (anti-enumeração, expiração 15 min, troca obrigatória, best-effort).
-- [ ] Nenhum comportamento divergente do PRD (CA-01..CA-12).
-- [ ] Todas as User Stories cobertas (tabela seção 5).
+- [x] Todas as 10 tasks estiverem completas e gates aprovados.
+- [x] Os 38 CTs do tech_spec §19 (+ CTs de infra T3/T4) validados (`make test` verde).
+- [x] `make build-all` (4 targets, CGO off) verde.
+- [x] Critérios técnicos do SPEC atendidos (anti-enumeração, expiração 15 min, troca obrigatória, best-effort).
+- [x] Nenhum comportamento divergente do PRD (CA-01..CA-12).
+- [x] Todas as User Stories cobertas (tabela seção 5).
 
 ---
 

@@ -465,6 +465,14 @@ Use a ferramenta `Edit` para substituir o placeholder `## 10. Testes` no arquivo
 3. **Estratégia de paralelismo** — quais tasks podem rodar juntas
 4. **Critério de conclusão da feature** — quando a feature inteira está pronta
 
+### Coerência de dependências e escopo (BLOQUEANTE)
+
+Antes de fixar a ordem na tabela, valide três direções que historicamente forçam reorder ou desvio de escopo na execução. Agnóstico de stack.
+
+- **Direção de dependência de símbolos.** Nenhuma TaskCard pode referenciar — nem em assertion de teste, nem em compile-time assertion — um símbolo (tipo, função, interface, constante) cujo **nascimento** está numa TaskCard **posterior**. Se ocorrer, **mova a referência** para a card que cria o símbolo OU declare a dependência e **reordene**. _(Run `esqueci-a-senha`: uma task referenciava `service.EmailSender`, nascida numa task posterior → reorder forçado em execução.)_
+- **Blast radius além dos arquivos tocados.** Quando uma card afeta estado/contrato **compartilhado** além dos arquivos que edita (estado global, contrato/schema em camada compartilhada, testes acoplados a ordem/profundidade), liste os **dependentes afetados** em §8.3 — ou nota autorizando tocá-los — e registre que a validação roda no **escopo do blast radius**, não só no módulo local.
+- **Mudança de assinatura arrasta dependentes.** Quando uma card altera a assinatura de um símbolo público, **inclua em §8.3 os dependentes mecanicamente forçados** (composition root, callers, testes que instanciam) ou nota autorizando tocá-los. Tocá-los para o contrato/build permanecer válido é "limpar a própria bagunça", não expansão de escopo — evita falso-positivo de `scope_deviation` no gate.
+
 ### Nomenclatura e local
 
 - Arquivo: path resolvido a partir de `taskcard.task_plan.path` em `.claude/rules/agent-spec-taskcard-workflow-rules.md` (com `{feature}` e `{version}` substituídos)

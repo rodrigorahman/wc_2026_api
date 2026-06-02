@@ -150,6 +150,7 @@ Popule `escopo_declarado` no JSON **apenas com os faltantes** (a apuração de d
 - **Action without assertion** (AP-06). → **ALTO**.
 - **Brittle selector** (AP-01): selector por classe CSS, índice ou xpath. → **MÉDIO**.
 - **Vague existence assertion** (AP-05): `.toBeTruthy()`, `.toBeDefined()` sem valor específico. → **MÉDIO**.
+- **Tautological assertion** (AP-29): asserção infalível que nunca pega regressão — ramo sempre-verdadeiro numa disjunção (`assert(A || cond)` com `cond` já garantida por asserção anterior), `expect(true).toBe(true)`, valor comparado consigo mesmo. **Distinto de AP-05**: aqui é *infalível*, não só frouxo. → **ALTO** (mascara regressão — Iron Law #1; severidade alinhada com o Tech Review).
 - **Coverage as vanity** (AP-15) / **Quarantine as cemetery** (AP-21) / **Eternal beforeAll** (AP-17) / **Duplicate cross-layer** (AP-23). → **MÉDIO**.
 - **Magic strings** (AP-19) / **Cleanup in afterEach** (AP-18). → **BAIXO**.
 - **AI zero edge cases** (AP-25): teste AI-gerado com 6+ assertions e zero negativo. → **ALTO**.

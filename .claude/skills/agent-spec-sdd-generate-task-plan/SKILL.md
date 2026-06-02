@@ -165,9 +165,21 @@ A seção 6 (Testes) gerada pelo `agent-spec-qa-test-generator` **NÃO** é opci
   - **(c)** Ignorar os testes DESTA task explicitamente (requer confirmação do usuário, registrado em observações da task)
 - O QA no gate REJEITA se testes exigidos não foram implementados.
 
----
+### Regra 10 — Coerência de dependências e escopo (BLOQUEANTE)
 
-## FASE 4 — Seção 6 (Testes) via Subagente QA
+Antes de fixar a ordem das tasks e finalizar o plano, valide três direções que historicamente forçam reorder ou desvio de escopo na execução. Agnóstico de stack.
+
+- **10a — Direção de dependência de símbolos.** Nenhuma task pode referenciar — nem em assertion de teste, nem em compile-time assertion — um símbolo (tipo, função, interface, constante) cujo **nascimento** está numa task **posterior**. Para cada símbolo citado por uma task, verifique em qual task ele é criado: se for posterior, **mova a referência** para a task que cria o símbolo OU declare a dependência explícita e **reordene**. _(Run `esqueci-a-senha`: T3 referenciava `service.EmailSender`, nascida em T5 → reorder forçado em execução.)_ **PERSISTA o resultado**: preencha `Símbolos públicos criados` e `Símbolos consumidos de outras tasks` (símbolo → task de origem) na seção 1 de cada `TN.md`. Esses campos não são opcionais — alimentam a derivação do flag (10d) e o guard de disjunção de símbolo do executor. Sem eles, o executor não consegue provar independência e cai para sequencial.
+- **10b — Blast radius além dos arquivos tocados.** Quando a mudança de uma task afeta estado/contrato **compartilhado** além dos arquivos que ela edita (estado global, contrato/schema em camada compartilhada, testes acoplados a ordem/profundidade de uma pilha), liste os **dependentes afetados** em §5.2 — ou uma nota autorizando tocá-los — e registre que a validação roda no **escopo do blast radius**, não só no módulo local. Vale para qualquer estado partilhado (migração no topo de uma pilha, contrato versionado, store global de front).
+- **10c — Mudança de assinatura arrasta dependentes.** Quando uma task altera a assinatura de um símbolo público (novo parâmetro obrigatório em construtor/função, mudança de retorno), **inclua em §5.2 os dependentes mecanicamente forçados** (composition root, callers, testes que instanciam) ou uma nota autorizando tocá-los. Tocá-los para o contrato/build permanecer válido é "limpar a própria bagunça", não expansão de escopo — evita falso-positivo de `scope_deviation` no gate.
+
+- **10d — Derivação do flag de paralelismo (NÃO autore por intuição).** A coluna `Pode Rodar em Paralelo?` do `task_plan.md` é **computada**, não adivinhada. Aplique o **"Invariante de Paralelismo"** de `.claude/rules/agent-spec-workflow-rules.md`. Para cada par de tasks da **mesma fase**, marque ambas `Sim` **somente se** TODAS valerem; caso contrário ambas (ou a consumidora) recebem `Não`:
+  1. **Independência no DAG** — nenhuma é ancestral/descendente da outra (deps diretas ou transitivas).
+  2. **Disjunção de símbolo** — `consumidos(ti) ∩ criados(tj) = ∅` nos dois sentidos (use os campos preenchidos em 10a).
+  3. **Paths declarados disjuntos** — seções 5.1+5.2 sem interseção.
+  4. **Nenhuma toca arquivo de alta contenção** em comum (container DI, router/registry, barrel, manifests, diretório de migrations — ver lista canônica na rule).
+
+  **Default em qualquer incerteza: `Não`** (falso-sequencial custa minutos; falso-paralelo corrompe a ordem de execução). A coluna da tabela e o resumo da FASE 7 ficam com a anotação "(derivado)". Uma task que depende de outra da **mesma fase** **nunca** sai `Sim` — se isso aparecer, há erro de derivação ou a dependência deveria estar em fase anterior.
 
 A **seção 6** de cada task NÃO é preenchida diretamente. Você DEVE delegar a geração ao subagente **`agent-spec-qa-test-generator`** e converter o JSON retornado em markdown estruturado.
 
@@ -273,10 +285,10 @@ Apresente um **resumo compacto** do Task Plan. **NÃO** exiba o `task_plan.md` o
 **Feature**: [nome]
 **Total**: N tasks em M fases
 
-| ID | Nome | Descrição | Fase | Dependências | Paralelo |
-|----|------|-----------|------|--------------|----------|
-| T1 | ...  | Breve descrição do objetivo da task | 1    | —            | Sim      |
-| T2 | ...  | Breve descrição do objetivo da task | 1    | —            | Sim      |
+| ID | Nome | Descrição | Fase | Dependências | Paralelo (derivado) |
+|----|------|-----------|------|--------------|---------------------|
+| T1 | ...  | Breve descrição do objetivo da task | 1    | —            | Sim                 |
+| T2 | ...  | Breve descrição do objetivo da task | 1    | —            | Sim                 |
 ...
 
 ### Arquivos salvos:
@@ -374,7 +386,9 @@ O `task_plan.md` inclui uma **tabela de rastreabilidade** que mapeia User Storie
 - [ ] Todas as fases definidas e validadas com o usuário
 - [ ] Todas as tasks criadas com template completo
 - [ ] Dependências entre tasks mapeadas e coerentes
-- [ ] Paralelismo identificado corretamente
+- [ ] `Símbolos públicos criados` / `Símbolos consumidos de outras tasks` preenchidos em cada `TN.md` (Regra 10a)
+- [ ] Flag `Pode Rodar em Paralelo?` **derivado** do DAG + símbolos (Regra 10d) — não autorado por intuição
+- [ ] Invariante satisfeito: nenhuma task `Sim` depende (direta/transitiva) de outra da mesma fase
 - [ ] Rastreabilidade User Stories → Tasks preenchida (todas US cobertas)
 - [ ] Critérios de conclusão da feature definidos
 - [ ] Seção 6 (Testes) preenchida em cada task (via QA ou redistribuição heurística)
