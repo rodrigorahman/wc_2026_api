@@ -46,6 +46,26 @@ Defina o critério de sucesso. Itere até verificar.
 
 ---
 
+## Stack de tecnologias
+
+| Camada | Tecnologia | Versão | Papel |
+|---|---|---|---|
+| Linguagem | Go | 1.26 | Runtime único, build cross-platform sem CGO |
+| Protocolo | gRPC + Protocol Buffers | grpc v1.74 / protobuf v1.36 | Contrato de API e transporte |
+| Geração proto | buf + protovalidate | buf.build/go/protovalidate v1.2 | Gera stubs e valida mensagens proto |
+| Injeção de dependência | uber-fx (+ uber-dig) | fx v1.23 | Wiring de módulos por domínio |
+| Banco de dados | SQLite pure-Go | modernc.org/sqlite v1.37 | Persistência sem CGO |
+| Migrações | golang-migrate | v4.19 | Versionamento de schema |
+| Queries tipadas | sqlc | (via `make sqlc`) | Gera código Go a partir do schema SQL |
+| Autenticação | golang-jwt/jwt v5 + bcrypt | jwt v5.2 / x/crypto v0.45 | JWT HS256, bcrypt cost 12 |
+| Configuração | spf13/viper | v1.21 | Leitura de config via arquivo/env |
+| Logging | uber-zap | v1.27 | Logs estruturados |
+| Middleware gRPC | go-grpc-middleware/v2 | v2.3 | Interceptors de auth, logging, recovery |
+| IDs | google/uuid | v1.6 | UUIDs v4 para entidades |
+| Testes | stretchr/testify | v1.11 | Assertions e suíte de testes |
+
+---
+
 ## Regras de stack (invioláveis neste projeto)
 
 > O detalhe e o "porquê" estão nas ADRs e nas rules por tema em [`.claude/rules/`](.claude/rules/) — carregadas automaticamente conforme os arquivos que você toca (persistência, idioma, DI/camadas, gRPC, auth/segurança, testes). Aqui o resumo que pesa em toda alteração:

@@ -393,7 +393,7 @@ Aplique durante TODA a execução:
 Ao final, produza saída em Markdown com seções:
 
 - **Tasks Concluídas** (lista com ID, nome, arquivos modificados, veredito QA, status Tech Review)
-- **Validação QA** (resumo por task: veredito, nota de qualidade, tentativas de correção)
+- **Validação QA** (resumo por task: veredito, tentativas de correção)
 - **Validação Tech Review** (resumo por task: status, problemas encontrados, tentativas de correção)
 - **Tasks Bloqueadas** (se houver: motivo, gate bloqueante, problemas pendentes)
 - **Observações do QA e Tech Review** (tasks aprovadas com observações)

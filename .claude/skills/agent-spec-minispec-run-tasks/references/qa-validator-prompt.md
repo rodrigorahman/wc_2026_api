@@ -41,7 +41,7 @@ Inclua:
 4. **Testes definidos** na task — o QA executa e verifica
 5. **Rastreabilidade de testes (BLOQUEANTE)**: lista de IDs (CT-01, CT-02, ...) da seção de Testes. Instrução literal:
    > "Cada CT DEVE ter teste correspondente implementado no código. Testes ausentes/vazios/skip/todo para CTs exigidos = REJEITADO na camada COMPLETUDE."
-6. **Comando de teste**: o QA detecta automaticamente via stack (manifest: `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `Gemfile`, `pubspec.yaml`, `pom.xml`, `build.gradle`, etc.) e executa o canônico.
+6. **Comando de teste**: o QA resolve pela precedência de descoberta de stack — (1) rule `.claude/rules/agent-spec-testing-stack.md` se existir; (2) CLAUDE.md/rules; (3) manifest do projeto (`package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `Gemfile`, `pubspec.yaml`, `pom.xml`, `build.gradle`, etc.), scripts e CI — e executa o canônico.
 7. **Caminhos de referência opcionais**: `minispec.scope.path` e `minispec.intent.path` — consulta sob demanda.
 8. **Economia de Leitura**: "Não leia arquivos desnecessários ao escopo desta task."
 
@@ -68,9 +68,9 @@ Você foi invocado com os seguintes parâmetros:
 
 OBRIGATÓRIO: Antes de produzir o JSON final:
 
-1. Invoque a skill `agent-spec-testing-best-practices` (Skill(skill="agent-spec-testing-best-practices")) e aplique a Camada 5 (Qualidade dos Testes) usando `references/antipadroes.md` como checklist. Cada antipadrão detectado em arquivos de teste tocados pela task deve aparecer **simultaneamente** em `testing_smells.antipadroes_detectados[]` e em `problemas.*` correspondente. Severidade do antipadrão determina veredito conforme política débito-controlado (críticos/altos bloqueiam; médios/baixos viram observações). Popule também `testing_smells.red_flags_detectadas[]`, `mock_budget_violado` e `determinismo_observado`.
+1. Invoque a skill `agent-spec-testing-best-practices` (Skill(skill="agent-spec-testing-best-practices")) e aplique a Camada 5 (Qualidade dos Testes) usando `references/antipadroes.md` como checklist. Cada antipadrão detectado em arquivos de teste tocados pela task vira um item em `problemas.*` com o campo `smell` preenchido (nome canônico). Severidade do antipadrão determina veredito conforme política débito-controlado (críticos/altos bloqueiam; médios/baixos viram observações). Popule também `testing_smells.red_flags_detectadas[]`, `mock_budget_violado` e `determinismo_observado`.
 
-2. **Aplique a Camada 6 (ADR Compliance Light)** — leia `docs/adr/INDEX.md` (ou liste `docs/adr/*.md`), identifique ADRs ativas grep-detectáveis e cruze com os arquivos tocados pela task. Violações claras viram `problemas.*` com `categoria: "adr_compliance"`. Popule `adr_compliance.adrs_consultadas[]` e `adr_compliance.violacoes_grep_detectaveis[]`.
+2. **Aplique a Camada 6 (ADR Compliance Light)** — leia `docs/adr/INDEX.md` (ou liste `docs/adr/*.md`), identifique ADRs ativas grep-detectáveis e cruze com os arquivos tocados pela task. Violações claras viram `problemas.*` com `categoria: "adr_compliance"`. Popule `adr_compliance.violacoes_grep_detectaveis[]`.
 
 3. **Detecte duplicatas semânticas (AP-26)** — para cada par de testes nos arquivos tocados, compare tupla `(test_name_normalizado, alvo_chamado, parametros_chave, resultado_esperado)`. Coincidência em ≥ 3 dos 4 campos sem justificativa → reporte como `MÉDIO` em `problemas.medios[]` com `categoria: "code_quality"`. Não confundir com table-driven (UM teste parametrizado é OK).
 
@@ -90,6 +90,8 @@ OBRIGATÓRIO: Antes de produzir o JSON final:
 | `APROVADO` | 0 | 0 | QA aprovado → avançar para Gate 2 |
 | `APROVADO_COM_OBSERVACOES` | 0 | ≥ 1 | QA aprovado com débito anotado → avançar para Gate 2; registrar médios/baixos em `qa-observations.md` |
 | `REJEITADO` | ≥ 1 | qualquer | Enviar críticos+altos como bloqueantes ao executor (3.5); médios/baixos como observações opcionais |
+
+> **Sinal `stack_discovery.discovery_needed: true`** (não afeta veredito): o QA não resolveu um detalhe **não-derivável do código** (ex.: framework E2E não padronizado, política de cobertura). Recomende ao usuário rodar **`/agent-spec-testing-stack-bootstrap`** — ele descobre a stack do código, pergunta só o não-derivável e gera `.claude/rules/agent-spec-testing-stack.md`. A partir daí o QA resolve a stack automaticamente. Não bloqueie o pipeline por esse sinal.
 
 ### 3.5 Loop de correção QA (memória lazy)
 
@@ -131,7 +133,7 @@ Se rejeitado:
    - `problemas.baixos[]`
    - `observacoes[]`
    - `testes_executados.detalhes_falhas[]`
-   - `criterios_aceitacao[]` onde `status == "FALHOU"` ou `"PARCIAL"`
+   - `criterios_falhos[]` (CAs com `status` `FALHOU` ou `PARCIAL`)
 
    > **Zero-débito**: NÃO filtre por severidade. A task não pode ser concluída com qualquer dívida técnica reportada.
 
@@ -160,7 +162,11 @@ Se rejeitado:
    ## Critérios de Aceite não Atendidos
    [lista com status FALHOU ou PARCIAL]
 
-   Corrija APENAS os problemas listados acima. Não expanda escopo. Após corrigir, execute os testes para garantir que passam.
+   Corrija APENAS os problemas listados acima. Não expanda escopo.
+
+   Para CADA problema, antes de editar escreva uma linha `CAUSA-RAIZ: <por que o teste ou o código estava errado>`. Correção que apenas faz o gate passar sem atacar a causa — inverter uma flag, enfraquecer a asserção, renomear — será RE-REPROVADA. Se o problema é asserção fraca, mock-driven ou teste oco: reescreva a asserção para validar o comportamento observável real (não ajuste o valor do mock nem inverta booleanos). Se algum problema já havia sido reprovado na tentativa anterior, a correção anterior foi insuficiente — ataque a origem, não o sintoma.
+
+   Após corrigir, execute os testes para garantir que passam.
 
    Arquivos a corrigir:
    [lista de arquivos dos problemas]

@@ -89,7 +89,7 @@ Padrões que sobrevivem a refactor. Aplicação em [references/padroes.md](refer
 11. **Mutation score** — meça quão bem os testes detectam mutações; cobertura sozinha mente.
 12. **Page Object Model collapsado** — POM é ferramenta, não religião. Inline simples > POM complexo quando reuso é baixo.
 13. **Repository sobre query layer** — nunca mocke o próprio Repository para testar Repository. Extraia interface mínima sobre a query layer gerada (SQLC/Prisma/jOOQ) no próprio repository; teste mocka a interface, SUT é o Repository real.
-14. **Fail-fast testável** — extraia validação de boot como função pura (`ValidateXConfig(cfg) error`); caller decide morrer (`logger.Error + os.Exit(1)`). Nunca `log.Fatal` inline no construtor — impossível de testar sem fork de subprocess.
+14. **Fail-fast testável** — extraia validação de boot como função pura que retorna erro/resultado (ex.: `validateConfig(cfg) -> error`); o caller decide abortar (log + exit não-zero). Nunca aborte o processo inline dentro do construtor (`log.Fatal`/`os.Exit`/`exit()`/`throw` não-capturável no boot) — torna o caminho intestável sem fork de subprocesso. Vale em qualquer stack (Go, Node, Python, Dart, JVM).
 
 ---
 

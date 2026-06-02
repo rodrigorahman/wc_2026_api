@@ -110,7 +110,7 @@ Monte a lista de `arquivos` que o subagente deve ler para CADA task. Inclua:
 - **Regras do projeto**: `CLAUDE.md`, `.claude/rules/*.md` (já são carregadas automaticamente no contexto do subagente — NÃO re-liste aqui).
 - **Migrações**: arquivos de migração relacionados à task (ex: `internal/db/migrations/*.sql`).
 - **Queries**: arquivos de query relacionados à task (ex: `internal/db/queries/*.sql`).
-- **Testes existentes**: arquivos de teste relacionados aos arquivos impactados pela task (ex: `*_test.go`, `*.spec.ts`).
+- **Testes existentes**: arquivos de teste relacionados aos arquivos impactados pela task, na convenção da stack (ex.: `*_test.go`, `*.spec.ts`/`*.test.ts`, `test_*.py`, `*_test.dart`, `*Test.java`).
 - **Código-fonte existente**: arquivos listados na seção 5 da task (a criar ou modificar).
 
 ---
@@ -173,18 +173,15 @@ Além dos testes tipo `SEGURANCA` e `PERFORMANCE`, inclua em 6.4 todos os `casos
 
 O formato DEVE seguir o **formato tabular** idêntico ao da seção de **Estratégia de Testes** do TECH_SPEC (seção 17 Web | 18 Mobile | 19 Backend, conforme a `variant` registrada em `sdd_state.yaml`). Isso garante consistência entre os dois documentos e facilita a validação visual.
 
-Infira o nome do arquivo de teste a partir do componente testado:
-- Handler → `[nome]_handler_test.go`
-- Service → `[nome]_service_test.go`
-- Repository → `[nome]_repository_test.go`
+Infira o nome do arquivo de teste a partir do componente testado, **na convenção da stack do projeto** (descoberta via `.claude/rules/agent-spec-testing-stack.md`, CLAUDE.md ou pelos testes existentes). Exemplos multi-stack para a mesma camada "Service":
+- Go → `service_test.go` · Python → `test_service.py` · TS → `service.spec.ts` · Dart → `service_test.dart` · JVM → `ServiceTest.kt`
 
-Infira o nome da função de teste a partir do título do CT:
-- Use formato `TestNomeMetodo_CenarioDescritivo` (Go convention, adaptar para a linguagem do projeto).
+Infira o nome da função/caso de teste a partir do título do CT, **na convenção da stack** (ex.: `TestMetodo_Cenario` em Go, `test_metodo_cenario` em Python, `describe/it("...")` em JS-TS, `metodo_cenario_test` em Dart). Não imponha a convenção de uma linguagem específica.
 
 **6.1 Testes Unitários** — formato tabular agrupado por componente:
 
 ```markdown
-#### [Camada]: [NomeComponente] (`arquivo_test.go`)
+#### [Camada]: [NomeComponente] (`[arquivo de teste na convenção da stack]`)
 
 Mock: [interfaces mockadas]
 
@@ -196,7 +193,7 @@ Mock: [interfaces mockadas]
 **6.2 Testes de Integração** — formato tabular com Setup acima:
 
 ```markdown
-#### [CamadaA + CamadaB] (`arquivo_test.go`)
+#### [CamadaA + CamadaB] (`[arquivo de teste na convenção da stack]`)
 
 Setup: [banco in-memory, migrações, fixtures]
 
@@ -256,7 +253,8 @@ Antes de integrar a seção 6 na task:
 1. Verifique **coerência** com as seções 1-5 da task (os componentes testados existem na seção 5?).
 2. Verifique que os testes cobrem os **critérios de aceite técnico** da seção 4.
 3. Ajuste nomenclatura de arquivos e funções de teste para seguir os padrões do projeto.
-4. Para tasks que NÃO envolvem código (ex: documentação, configuração), preencha "N/A — task não envolve código testável".
+4. **Concretude da asserção (BLOQUEANTE)**: nenhuma célula de "Expected"/"Validação" das tabelas 6.1-6.4 pode conter termo vago ("tratável", "correto", "válido", "não vazio", "funciona"). Cada uma deve trazer valor exato, sentinela/tipo de erro ou código de status (priorize `negative_companion.assertion_esperada` do JSON). Se alguma ficar vaga, reescreva ou regenere com o subagente — o executor implementa a célula literalmente.
+5. Para tasks que NÃO envolvem código (ex: documentação, configuração), preencha "N/A — task não envolve código testável".
 
 ---
 

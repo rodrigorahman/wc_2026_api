@@ -22,9 +22,9 @@ Monte a lista de `arquivos` que o subagente deve ler. Inclua TODOS os caminhos r
 
 - **PRD aprovado**: path resolvido a partir de `sdd.prd.path` (CLAUDE.md)
 - **Regras do projeto**: `CLAUDE.md`, `.claude/rules/*.md` (se existirem)
-- **Migrações**: arquivos de migração relacionados à feature (ex: `internal/db/migrations/*.sql` em projetos Go, conforme padrão do codebase)
-- **Queries**: arquivos de queries relacionados à feature (ex: `internal/db/queries/*.sql` em projetos com SQLC)
-- **Testes existentes**: busque arquivos de teste do projeto (ex: `*_test.go`, `*.spec.ts`) para o subagente entender padrões
+- **Migrações / schema**: arquivos de migração/esquema relacionados à feature, conforme o padrão do codebase (ex.: `*/migrations/*.sql`, `*/migrate/*.go`, `prisma/migrations/*`, `db/migrate/*.rb`, `alembic/versions/*.py`)
+- **Camada de dados**: arquivos de queries/repositories relacionados à feature, conforme a stack (ex.: `*.sql` com SQLC, schema Prisma, repositórios/DAOs)
+- **Testes existentes**: busque arquivos de teste do projeto na convenção da stack (ex.: `*_test.go`, `*.spec.ts`/`*.test.ts`, `test_*.py`, `*_test.dart`, `*Test.java`) para o subagente entender padrões
 - **Código-fonte existente**: arquivos que serão modificados pela feature
 
 ---
@@ -187,6 +187,7 @@ Antes de integrar a seção de testes no TECH_SPEC:
    - Pelo menos um caso por feature tem `real_execution_boundary != "none"`?
    - Cada caso positivo (`categoria: caminho_feliz | interacao_usuario`) tem `negative_companion.presente: true` apontando para um caso negativo?
    - Se algum item falhar, **re-disparar** o subagente com instrução pontual para corrigir, OU rejeitar o JSON e abrir solicitação no chat.
+   - **`stack_discovery.discovery_needed`**: se `true`, o subagente não conseguiu resolver um detalhe **não-derivável do código** (ex.: framework E2E não padronizado). Recomende ao usuário rodar **`/agent-spec-testing-stack-bootstrap`** para descobrir a stack (com questionário do não-derivável) e gerar a rule `.claude/rules/agent-spec-testing-stack.md` — depois reexecute a delegação. Não bloqueie a geração por isso; siga best-effort com o proposto.
 
 ---
 

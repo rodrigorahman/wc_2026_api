@@ -428,6 +428,7 @@ Mapeamento entre critérios de aceite (seção 9) e testes que os validam:
 4. **10.4**: Montar a partir de `stack_identificada` do JSON e do `CLAUDE.md`/ADRs com tag `testing` já no contexto
 5. **10.5**: Filtrar `casos_teste` com `categoria` == `teste_negativo` ou `tratamento_erro`. Montar tabela com: título como Cenário, dados_entrada como Trigger, resultado_esperado como Expected, código gRPC/HTTP como Código/Status
 6. **10.6**: Agrupar por critério de aceite da seção 9. Para cada critério, listar os testes que o validam (campo `criterios_aceitacao_validados`)
+7. **Concretude (BLOQUEANTE)**: nenhuma célula de "Expected"/"Validação"/"resultado esperado" (10.2/10.5/10.6) pode conter termo vago ("tratável", "correto", "válido", "não vazio", "funciona"). Use valor exato, sentinela/tipo de erro ou status code (priorize `negative_companion.assertion_esperada` do JSON). Reescreva ou regenere as que ficarem vagas — o executor implementa a célula literalmente.
 
 ### Após formatar
 

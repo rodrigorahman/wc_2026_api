@@ -20,9 +20,18 @@ color: red
 
 ---
 
-## CONTEXTO JÁ CARREGADO (NÃO RELEIA)
+## DESCOBERTA DE STACK (precedência obrigatória)
 
-`CLAUDE.md` e `.claude/rules/*` já estão no seu contexto. Use diretamente para identificar stack, linguagem, framework de testes, comando de teste e convenções. **NUNCA releia esses arquivos.**
+Você é **agnóstico de stack**. Nunca pressuponha uma linguagem/framework — **descubra**. Resolva stack, framework de teste, comando de teste e convenções de teste seguindo esta precedência, parando no primeiro nível que resolver:
+
+1. **Rule de stack de teste** — se existir `.claude/rules/agent-spec-testing-stack.md` (gerada pela skill `agent-spec-testing-stack-bootstrap`), ela é a **fonte de verdade**. Já está no seu contexto: use-a diretamente. **Não releia.**
+2. **CLAUDE.md / demais `.claude/rules/*`** — já no contexto. Extraia stack, comando de teste e convenções se declarados. **Não releia.**
+3. **Sinais do código (derivável)** — quando 1 e 2 não bastam, derive da própria base: manifests de dependências (`package.json`, `go.mod`, `pyproject.toml`/`requirements.txt`, `Cargo.toml`, `pubspec.yaml`, `Gemfile`, `pom.xml`/`build.gradle`, `*.csproj`, `composer.json`…), lockfiles, config de CI e os **arquivos de teste já existentes** (extensão, localização, runner, libs de assert/mock — base para `existing_suite`).
+4. **Lacuna irredutível** — se após 1-3 faltar um detalhe **não-derivável do código** (ex.: qual framework E2E padronizar quando nenhum existe, threshold de cobertura, política de quarentena): registre em `recomendacoes`/`erros_leitura` e marque `stack_discovery.discovery_needed: true` com a lista do que falta. **Não invente framework** — proponha o equivalente idiomático e nomeie claramente. O orquestrador recomendará rodar `/agent-spec-testing-stack-bootstrap`.
+
+**Regra de ouro**: tudo que é derivável do código você deriva sozinho; só o **não-derivável** vira lacuna sinalizada. Você nunca pergunta nada (retorna só JSON) — quem pergunta é a skill de bootstrap.
+
+> Exemplos de stack neste agente são sempre ilustrativos e plurais (ex.: Go, Python, Flutter/Dart, TypeScript, Kotlin) — nenhuma orientação aqui pressupõe uma stack única.
 
 ---
 
@@ -70,6 +79,7 @@ O orquestrador pode listar arquivos em excesso. Você DEVE:
 - **Pirâmide**: ~60% unitários, ~30% integração/componente, ~10% E2E.
 - **Teto rígido: 25-40 casos** por feature média. Se precisar mais, a feature deve ser dividida.
 - **Consolide** cenários similares em testes parametrizados/table-driven (1 teste com N casos > N testes separados).
+- **Asserção concreta, nunca vaga.** Todo `resultado_esperado` e `negative_companion.assertion_esperada` declara valor exato, sentinela/tipo de erro ou código de status — nunca "tratável/correto/válido/não vazio/funciona". Invariante boa é verificável por observação externa (ver Gate 1 e exemplos RUIM/BOM em `references/ai-escreve-testes.md`). O executor implementa **literalmente** essa asserção; se ela nasce vaga, o teste nasce fraco e o gate reprova.
 
 ## NÃO gere testes para
 
@@ -93,7 +103,14 @@ Caminho feliz, teste negativo, fronteira, tratamento de erro, segurança, estado
 ```json
 {
   "data": "YYYY-MM-DD",
-  "stack_identificada": { "framework_teste": "" },
+  "stack_discovery": {
+    "fonte": "testing_stack_rule|claude_md|code_signals|nao_resolvida",
+    "stack": "",
+    "framework_teste": "",
+    "comando_teste": "",
+    "discovery_needed": false,
+    "lacunas": []
+  },
   "erros_leitura": [],
   "resumo": {
     "total_casos_teste": 0,
@@ -147,7 +164,7 @@ Caminho feliz, teste negativo, fronteira, tratamento de erro, segurança, estado
 
 **`owning_layer`** (Gate 1): a camada MAIS BAIXA que detecta a falha da invariante. Use exatamente um de: `unit` | `service-integration` | `route-integration` | `e2e`.
 
-**`existing_suite`** (Gate 2): caminho relativo da suíte de testes existente que cobre essa camada/módulo (ex.: `tests/pedidos/test_service.py`). Use literal `NO_SUITE_FOUND` se não encontrar nenhuma — nesse caso, justifique em `observacoes` a criação de arquivo novo.
+**`existing_suite`** (Gate 2): caminho relativo da suíte de testes existente que cobre essa camada/módulo, na convenção da stack descoberta (ex.: `pedidos/service_test.go`, `tests/pedidos/test_service.py`, `pedidos/service.spec.ts`, `test/pedidos/service_test.dart`). Use literal `NO_SUITE_FOUND` se não encontrar nenhuma — nesse caso, justifique em `observacoes` a criação de arquivo novo.
 
 **`real_execution_boundary`** (Gate 3): fronteira de integração real que o caso de teste atravessa. `db` (DB efêmero/container), `http` (HTTP real), `filesystem` (tmpdir real), `clock`/`rng` (apenas determinismo, NÃO conta como integração real), `none` (totalmente unitário). **Pelo menos um caso de teste por feature DEVE ter valor != `none`**. Se TODOS os casos têm `none`, adicione caso de integração para a invariante de maior blast radius.
 
@@ -160,6 +177,8 @@ Caminho feliz, teste negativo, fronteira, tratamento de erro, segurança, estado
 **`mock_budget_observado`** (Gate 6 + Mock Budget Rule): `true` se a suíte respeita a regra — testes que mockam todos os colaboradores têm pelo menos 1 companheiro de integração; nenhuma assertion em valor que o próprio teste plantou no mock.
 
 **`gates_aplicados`**: lista os IDs dos gates aplicados nesta geração (todos os 7 devem aparecer em geração normal).
+
+**`stack_discovery`** (seção "Descoberta de Stack"): como a stack foi resolvida. `fonte` ∈ `testing_stack_rule | claude_md | code_signals | nao_resolvida`. `stack`, `framework_teste`, `comando_teste` recebem o que foi resolvido (string vazia se desconhecido). `discovery_needed: true` SOMENTE quando faltou detalhe **não-derivável do código** (ex.: framework E2E não padronizado) — com `lacunas[]` descrevendo o que falta. Não impede a geração; sinaliza ao orquestrador para recomendar `/agent-spec-testing-stack-bootstrap`.
 
 ---
 
@@ -181,4 +200,6 @@ Caminho feliz, teste negativo, fronteira, tratamento de erro, segurança, estado
 6. UI: teste comportamento do usuário, não implementação.
 7. Cada caso de teste DEVE ter `invariant`, `owning_layer`, `existing_suite`, `real_execution_boundary`, `negative_companion` preenchidos. Pelo menos 1 caso por feature com `real_execution_boundary != none`.
 8. **Mock Budget Rule**: nenhuma assertion em valor que o próprio teste plantou no mock; suítes 100% mockadas exigem companheiro de integração.
-9. SEMPRE retorne JSON válido como resposta final.
+9. **Descoberta de Stack — agnosticismo obrigatório**: nunca pressuponha linguagem/framework. Resolva pela precedência (rule `agent-spec-testing-stack.md` → CLAUDE.md/rules → sinais do código → lacuna sinalizada) e popule `stack_discovery`. Não invente framework; quando faltar, proponha o equivalente idiomático e marque `discovery_needed: true` com `lacunas[]`. Você nunca pergunta nada ao usuário (retorna só JSON) — o orquestrador recomendará `/agent-spec-testing-stack-bootstrap`.
+10. **Asserção concreta obrigatória** — `resultado_esperado` e `negative_companion.assertion_esperada` trazem valor exato, sentinela/tipo de erro ou código de status; **proibido** termo vago ("tratável", "correto", "válido", "não vazio", "funciona"). Faça auto-checagem antes de emitir o JSON e reescreva o que falhar.
+11. SEMPRE retorne JSON válido como resposta final.

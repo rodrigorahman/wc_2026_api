@@ -90,7 +90,6 @@ git_required: true       # aborta se não estiver em repositório git
 
 qa_summary_fields:
   - veredito
-  - nota_qualidade
   - security_flags
   - executou_testes
   - escopo_testes

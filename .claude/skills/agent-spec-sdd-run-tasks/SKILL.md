@@ -116,7 +116,6 @@ git_required: true       # aborta se não estiver em repositório git
 
 qa_summary_fields:
   - veredito
-  - nota_qualidade
   - security_flags
   - executou_testes
   - escopo_testes
@@ -438,7 +437,7 @@ Inclua:
 4. **Testes definidos** (seção 6) — QA executa e verifica
 5. **Rastreabilidade de testes (BLOQUEANTE)**: lista de IDs (CT-01, CT-02, ...) da seção 6. Instrução literal:
    > "Cada CT da seção 6 DEVE ter teste correspondente implementado no código. Testes ausentes/vazios/skip/todo para CTs exigidos = REJEITADO na camada COMPLETUDE."
-6. **Comando de teste**: o QA detecta automaticamente via stack (manifest, scripts, CI) e executa o canônico.
+6. **Comando de teste**: o QA resolve pela precedência de descoberta de stack — (1) rule `.claude/rules/agent-spec-testing-stack.md` se existir; (2) CLAUDE.md/rules; (3) manifest, scripts e CI do projeto — e executa o canônico. Se o QA retornar `stack_discovery.discovery_needed: true`, recomende rodar `/agent-spec-testing-stack-bootstrap` (descobre a stack e gera a rule); não bloqueie o pipeline por esse sinal.
 7. **Caminhos de referência opcionais**: `sdd.tech_spec.path` e `sdd.prd.path` — consulta sob demanda.
 8. **Economia de Leitura**: "Não leia arquivos desnecessários ao escopo desta task."
 
@@ -465,9 +464,9 @@ Você foi invocado com os seguintes parâmetros:
 
 OBRIGATÓRIO: Antes de produzir o JSON final:
 
-1. Invoque a skill `agent-spec-testing-best-practices` (Skill(skill="agent-spec-testing-best-practices")) e aplique a Camada 5 (Qualidade dos Testes) usando `references/antipadroes.md` como checklist. Cada antipadrão detectado em arquivos de teste tocados pela task deve aparecer **simultaneamente** em `testing_smells.antipadroes_detectados[]` e em `problemas.*` correspondente. Severidade do antipadrão determina veredito conforme política débito-controlado (críticos/altos bloqueiam; médios/baixos viram observações). Popule também `testing_smells.red_flags_detectadas[]`, `mock_budget_violado` e `determinismo_observado`.
+1. Invoque a skill `agent-spec-testing-best-practices` (Skill(skill="agent-spec-testing-best-practices")) e aplique a Camada 5 (Qualidade dos Testes) usando `references/antipadroes.md` como checklist. Cada antipadrão detectado em arquivos de teste tocados pela task vira um item em `problemas.*` com o campo `smell` preenchido (nome canônico). Severidade do antipadrão determina veredito conforme política débito-controlado (críticos/altos bloqueiam; médios/baixos viram observações). Popule também `testing_smells.red_flags_detectadas[]`, `mock_budget_violado` e `determinismo_observado`.
 
-2. **Aplique a Camada 6 (ADR Compliance Light)** — leia `docs/adr/INDEX.md` (ou liste `docs/adr/*.md`), identifique ADRs ativas grep-detectáveis e cruze com os arquivos tocados pela task. Violações claras viram `problemas.*` com `categoria: "adr_compliance"`. Popule `adr_compliance.adrs_consultadas[]` e `adr_compliance.violacoes_grep_detectaveis[]`.
+2. **Aplique a Camada 6 (ADR Compliance Light)** — leia `docs/adr/INDEX.md` (ou liste `docs/adr/*.md`), identifique ADRs ativas grep-detectáveis e cruze com os arquivos tocados pela task. Violações claras viram `problemas.*` com `categoria: "adr_compliance"`. Popule `adr_compliance.violacoes_grep_detectaveis[]`.
 
 3. **Detecte duplicatas semânticas (AP-26)** — para cada par de testes nos arquivos tocados, compare tupla `(test_name_normalizado, alvo_chamado, parametros_chave, resultado_esperado)`. Coincidência em ≥ 3 dos 4 campos sem justificativa → reporte como `MÉDIO` em `problemas.medios[]` com `categoria: "code_quality"`. Não confundir com table-driven (UM teste parametrizado é OK).
 
@@ -528,7 +527,7 @@ Se rejeitado:
    - `problemas.baixos[]`
    - `observacoes[]`
    - `testes_executados.detalhes_falhas[]`
-   - `criterios_aceitacao[]` onde `status == "FALHOU"` ou `"PARCIAL"`
+   - `criterios_falhos[]` (CAs com `status` `FALHOU` ou `PARCIAL`)
 
    > **Zero-débito**: NÃO filtre por severidade. A task não pode ser concluída com qualquer dívida técnica reportada.
 
@@ -557,7 +556,11 @@ Se rejeitado:
    ## Critérios de Aceite não Atendidos
    [lista com status FALHOU ou PARCIAL]
 
-   Corrija APENAS os problemas listados acima. Não expanda escopo. Após corrigir, execute os testes para garantir que passam.
+   Corrija APENAS os problemas listados acima. Não expanda escopo.
+
+   Para CADA problema, antes de editar escreva uma linha `CAUSA-RAIZ: <por que o teste ou o código estava errado>`. Correção que apenas faz o gate passar sem atacar a causa — inverter uma flag, enfraquecer a asserção, renomear — será RE-REPROVADA. Se o problema é asserção fraca, mock-driven ou teste oco: reescreva a asserção para validar o comportamento observável real (não ajuste o valor do mock nem inverta booleanos). Se algum problema já havia sido reprovado na tentativa anterior, a correção anterior foi insuficiente — ataque a origem, não o sintoma.
+
+   Após corrigir, execute os testes para garantir que passam.
 
    Arquivos a corrigir:
    [lista de arquivos dos problemas]
@@ -594,7 +597,6 @@ Extraia do JSON completo do QA (preservado no Passo 3) **APENAS os campos** de `
 ```json
 {
   "veredito": "APROVADO|APROVADO_COM_OBSERVACOES",
-  "nota_qualidade": N,
   "security_flags": [...],
   "executou_testes": true|false,
   "escopo_testes": "SUITE_COMPLETA|PARCIAL|NAO_EXECUTADO",
@@ -608,7 +610,7 @@ Extraia do JSON completo do QA (preservado no Passo 3) **APENAS os campos** de `
 }
 ```
 
-> NÃO envie `problemas[]`, `files_reviewed[]`, `criterios_aceitacao[]` no prompt do staff. O agente gera o diff por conta própria; o sumário cobre a metadata. O campo `escopo_declarado` vem da Camada 0 do QA (presença dos entregáveis declarados na task).
+> NÃO envie `problemas[]`, `criterios_falhos[]` nem o restante do JSON do QA no prompt do staff. O agente gera o diff por conta própria; o sumário cobre a metadata. O campo `escopo_declarado` vem da Camada 0 do QA (presença dos entregáveis declarados na task).
 
 #### 6.3 Categorizar paths (NOVOS vs MODIFICADOS)
 
@@ -897,7 +899,7 @@ Aplique durante TODA a execução:
 Ao final, produza saída em Markdown com seções:
 
 - **Tasks Concluídas** (lista com ID, nome, arquivos modificados, veredito QA, status Tech Review)
-- **Validação QA** (resumo por task: veredito, nota de qualidade, tentativas de correção)
+- **Validação QA** (resumo por task: veredito, tentativas de correção)
 - **Validação Tech Review** (resumo por task: status, problemas encontrados, tentativas de correção)
 - **Tasks Bloqueadas** (se houver: motivo, gate bloqueante, problemas pendentes)
 - **Observações do QA e Tech Review** (tasks aprovadas com observações)

@@ -32,7 +32,6 @@ Extraia do JSON completo do QA (preservado em 3.3) **APENAS os campos** de `qa_s
 ```json
 {
   "veredito": "APROVADO|APROVADO_COM_OBSERVACOES",
-  "nota_qualidade": N,
   "security_flags": [...],
   "executou_testes": true|false,
   "escopo_testes": "SUITE_COMPLETA|PARCIAL|NAO_EXECUTADO",
@@ -48,7 +47,7 @@ Extraia do JSON completo do QA (preservado em 3.3) **APENAS os campos** de `qa_s
 
 > O campo `escopo_declarado` vem da Camada 0 do QA (Completude de Escopo Declarado). Tech Review usa para confirmar que entregáveis estruturais não ficaram faltando. Se QA aprovou mas `escopo_declarado.fonte == "ausente"`, Tech Review precisa fazer a checagem de presença ele mesmo (ver agente).
 
-> NÃO envie `problemas[]`, `files_reviewed[]`, `criterios_aceitacao[]` no prompt do staff. O agente gera o diff por conta própria; o sumário cobre a metadata.
+> NÃO envie `problemas[]`, `criterios_falhos[]` nem o restante do JSON do QA no prompt do staff. O agente gera o diff por conta própria; o sumário cobre a metadata.
 
 #### 4.1.3 Categorizar paths (NOVOS vs MODIFICADOS)
 

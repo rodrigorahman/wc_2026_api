@@ -7,7 +7,7 @@
 > **Arquivo canônico**: este (`agent-spec-minispec-run-tasks/references/executor-discipline.md`).
 > Symlinks em `agent-spec-sdd-run-tasks/references/executor-discipline.md` e `agent-spec-taskcard-run/references/executor-discipline.md` apontam para cá. Edição em UM lugar propaga para os 3.
 >
-> **Motivação do conteúdo**: o sub-agente executor roda em contexto isolado — não herda CLAUDE.md nem rules do orquestrador. Sem instrução explícita no prompt, o LLM tende aos vícios típicos de IA em código: over-engineering, refactor não pedido, error handling defensivo sem caso de uso, mudanças além do escopo. Estas 4 Iron Rules (adaptação das Karpathy Guidelines ao vocabulário agent-spec) mitigam esses vícios na fonte.
+> **Motivação do conteúdo**: o sub-agente executor roda em contexto isolado — não herda CLAUDE.md nem rules do orquestrador. Sem instrução explícita no prompt, o LLM tende aos vícios típicos de IA em código: over-engineering, refactor não pedido, error handling defensivo sem caso de uso, mudanças além do escopo e — ao escrever testes — asserção fraca, mock-driven confidence e happy-path-only. Estas 5 regras (as 4 Iron Rules adaptadas das Karpathy Guidelines + a disciplina de testes) mitigam esses vícios na fonte.
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## Disciplina do Executor (Iron Rules)
 
-Quatro regras invioláveis. Aplique antes e durante a implementação. Pesam mais do que qualquer instinto de "melhorar enquanto está aqui".
+Cinco regras invioláveis. Aplique antes e durante a implementação. Pesam mais do que qualquer instinto de "melhorar enquanto está aqui".
 
 ### 1. Pense antes de codar
 
@@ -75,9 +75,24 @@ A seção de Testes da task **NÃO é opcional**. Se o projeto não tiver engine
 
 Sem teste verde para cada critério, **não reporte concluída**.
 
+### 5. Disciplina de testes (a doutrina pela qual o QA vai te reprovar)
+
+A asserção definida na seção de Testes é **contrato literal** — implemente-a como está, sem enfraquecer. Os vícios abaixo são os que mais reprovam tasks no gate; trate-os como proibições. **Regras agnósticas de linguagem/framework**: use o equivalente idiomático da stack do projeto (a assertion lib, o runner e as convenções já presentes no código); os nomes de API entre parênteses são apenas ilustrativos e plurais.
+
+- **Asserção literal, nunca genérica.** Se a seção de Testes especifica um valor, sentinela ou código, asserte exatamente aquele — não uma forma mais frouxa:
+  - erro → asserte o **tipo/sentinela específico**, nunca apenas "ocorreu um erro" (ex.: `errors.Is` em Go, `rejects.toThrow(Err)` em JS-TS, `pytest.raises(Err)` em Python, `assertThrows(Err)` na JVM — em vez de um "is error" genérico).
+  - valor → asserte o **valor exato**, nunca existência genérica (ex.: igualdade de valor em vez de `NotEmpty`/`toBeDefined`/`isNotNull`/`assertNotNull`).
+  - dublê de teste (mock/spy/stub) → asserte os **argumentos e o número de chamadas**, nunca apenas "foi chamado".
+- **Todo positivo tem negativo.** Se a spec do teste marca um `negative_companion`, o teste negativo é obrigatório, com asserção específica — não um caso "não lança erro" vazio.
+- **Não asserte o que o mock plantou.** Programar o dublê para retornar X e então asserir `== X` sem o SUT transformar X é teste oco (mock-driven confidence). Se mockou todos os colaboradores, entregue também o teste de integração que a spec pediu.
+- **Toda ação tem asserção.** Teste que executa e não verifica resultado observável (retorno, estado ou side-effect) não conta como teste.
+- **Falha = corrija o SUT, não o teste.** Se um teste falha, investigue o código de produção primeiro. Só altere o teste com uma linha `SUT_IS_CORRECT_BECAUSE: <motivo>` justificando por que o teste estava errado.
+
+Estas regras espelham a doutrina `agent-spec-testing-best-practices` (fonte única) — são exatamente os gates que o QA aplica para reprovar. Escreva certo na primeira passada, não no retry.
+
 ---
 
-**Conflito entre estas regras e o resto do prompt**: estas 4 regras prevalecem. Se algo no prompt da task parecer puxar para over-engineering ou mudança fora do escopo, pause e pergunte.
+**Conflito entre estas regras e o resto do prompt**: estas 5 regras prevalecem. Se algo no prompt da task parecer puxar para over-engineering ou mudança fora do escopo, pause e pergunte.
 
 EXECUTOR_DISCIPLINE>>>
 
@@ -125,4 +140,4 @@ Logue no `shared.qa_observations.path` (uma vez por run, não por task) que o bl
 
 ## Reforço no Tech Review
 
-A categoria `speculative_complexity` no `agent-spec-staff-architecture-review` materializa a Regra 2 como violação detectável no Gate 2. A Regra 3 já tem suporte em `scope_deviation`. Regras 1 e 4 são preventivas (vivem no prompt do executor); não há categoria dedicada — quando aparecem como problema no Tech Review, são consequência (acoplamento, testes fracos, etc.) e caem nas categorias existentes.
+A categoria `speculative_complexity` no `agent-spec-staff-architecture-review` materializa a Regra 2 como violação detectável no Gate 2. A Regra 3 já tem suporte em `scope_deviation`. A Regra 5 (disciplina de testes) é validada no Gate 1 pelo `agent-spec-qa-validator` (Camada 5 — Qualidade dos Testes): asserção fraca, mock-driven, happy-path-only e teste enfraquecido viram `problemas.*` com `categoria: tests` e os antipadrões correspondentes em `testing_smells`. Regras 1 e 4 são preventivas (vivem no prompt do executor); não há categoria dedicada — quando aparecem como problema, caem nas categorias existentes.

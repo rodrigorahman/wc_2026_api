@@ -75,7 +75,6 @@ Você recebe do orquestrador:
    - **`Arquivos MODIFICADOS`**: paths que já existiam e foram alterados. O `git diff <base_sha> -- <path>` retorna apenas os hunks alterados (com 3 linhas de contexto).
 4. **Sumário mínimo do QA Validator** (OBRIGATÓRIO) — JSON enxuto com:
    - `veredito` ("APROVADO" | "APROVADO_COM_OBSERVACOES" | "REJEITADO")
-   - `nota_qualidade` (0-10)
    - `security_flags` (lista; se não vazia → orquestrador já te escalou para Opus)
    - `executou_testes` (bool)
    - `escopo_testes` ("SUITE_COMPLETA" | "PARCIAL" | "NAO_EXECUTADO")
@@ -349,9 +348,7 @@ O `status` é **determinado pela severidade dos problemas**, não por julgamento
       "adr_referenciada": ""
     }
   ],
-  "adrs_consultadas": [
-    { "id": "ADR-0001", "arquivo": "docs/adr/0001-repository-service.md", "relevancia": "alta|media|baixa" }
-  ],
+  "adrs_consultadas": ["ADR-0001", "ADR-0004"],
   "rule_candidates_emitidos": [
     {
       "id": "RC-001",
@@ -369,7 +366,7 @@ O `status` é **determinado pela severidade dos problemas**, não por julgamento
 
 Se não houver problemas, `problems: []`. O JSON completo do QA permanece com o orquestrador — não duplique `qa_input`, `testes_executados` ou echo de stack aqui. Problemas de qualidade de teste entram em `problems[]` com `category: "testability"`. Falhas detectadas em re-execução de suíte entram em `problems[]` com `severity: "critical"`.
 
-**Campo `adrs_consultadas[]`**: lista **obrigatória** das ADRs que você efetivamente consultou para julgar esta task. Use `[]` apenas se o projeto não possui ADRs ou se nenhuma era relevante ao escopo tocado. Relevância: `"alta"` = ADR diretamente aplicável ao diff; `"media"` = contexto útil; `"baixa"` = mencionada para descarte. Auditabilidade: sem este campo, não há como detectar ADR ignorada.
+**Campo `adrs_consultadas[]`**: lista **obrigatória** dos IDs das ADRs que você efetivamente consultou para julgar esta task (ex.: `["ADR-0001", "ADR-0004"]`). Use `[]` apenas se o projeto não possui ADRs ou se nenhuma era relevante ao escopo tocado. Auditabilidade: sem este campo, não há como detectar ADR ignorada.
 
 **Campo `rule_candidates_emitidos[]`** (Sinais para Rule Mining): sinais não-bloqueantes para a skill `agent-spec-mine-rule-candidates` consolidar offline. **Não afeta `status`.** Cada item:
 - `id`: identificador estável `RC-001`, `RC-002`, ...

@@ -306,7 +306,8 @@ Antes de integrar a Seção 5 (Testes) na task:
 1. Verifique **coerência** com os arquivos impactados (os componentes testados existem?).
 2. Verifique que os testes cobrem os **critérios de conclusão** da task.
 3. Ajuste nomenclatura para seguir padrões do projeto.
-4. Para tasks SEM código (documentação, configuração): preencher "N/A — task não envolve código testável".
+4. **Concretude da asserção (BLOQUEANTE)**: nenhuma célula de "Expected"/"Validação" pode conter termo vago ("tratável", "correto", "válido", "não vazio", "funciona"). Cada uma deve trazer valor exato, sentinela/tipo de erro ou código de status (priorize `negative_companion.assertion_esperada` do JSON). Se alguma ficar vaga, reescreva ou regenere com o subagente — o executor implementa a célula literalmente.
+5. Para tasks SEM código (documentação, configuração): preencher "N/A — task não envolve código testável".
 
 ### Passo 6: Integrar e seguir
 
