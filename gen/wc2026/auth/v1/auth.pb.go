@@ -188,11 +188,12 @@ func (x *LoginRequest) GetPassword() string {
 }
 
 type LoginResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	AccessToken            string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
+	ExpiresAt              *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	PasswordChangeRequired bool                   `protobuf:"varint,3,opt,name=password_change_required,json=passwordChangeRequired,proto3" json:"password_change_required,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *LoginResponse) Reset() {
@@ -237,6 +238,13 @@ func (x *LoginResponse) GetExpiresAt() *timestamppb.Timestamp {
 		return x.ExpiresAt
 	}
 	return nil
+}
+
+func (x *LoginResponse) GetPasswordChangeRequired() bool {
+	if x != nil {
+		return x.PasswordChangeRequired
+	}
+	return false
 }
 
 type GetMeRequest struct {
@@ -343,6 +351,182 @@ func (x *GetMeResponse) GetNationalTeamIds() []string {
 	return nil
 }
 
+type RequestPasswordRecoveryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestPasswordRecoveryRequest) Reset() {
+	*x = RequestPasswordRecoveryRequest{}
+	mi := &file_wc2026_auth_v1_auth_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestPasswordRecoveryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestPasswordRecoveryRequest) ProtoMessage() {}
+
+func (x *RequestPasswordRecoveryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_wc2026_auth_v1_auth_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestPasswordRecoveryRequest.ProtoReflect.Descriptor instead.
+func (*RequestPasswordRecoveryRequest) Descriptor() ([]byte, []int) {
+	return file_wc2026_auth_v1_auth_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *RequestPasswordRecoveryRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+type RequestPasswordRecoveryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestPasswordRecoveryResponse) Reset() {
+	*x = RequestPasswordRecoveryResponse{}
+	mi := &file_wc2026_auth_v1_auth_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestPasswordRecoveryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestPasswordRecoveryResponse) ProtoMessage() {}
+
+func (x *RequestPasswordRecoveryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_wc2026_auth_v1_auth_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestPasswordRecoveryResponse.ProtoReflect.Descriptor instead.
+func (*RequestPasswordRecoveryResponse) Descriptor() ([]byte, []int) {
+	return file_wc2026_auth_v1_auth_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *RequestPasswordRecoveryResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type ChangePasswordRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TempPassword  string                 `protobuf:"bytes,1,opt,name=temp_password,json=tempPassword,proto3" json:"temp_password,omitempty"`
+	NewPassword   string                 `protobuf:"bytes,2,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChangePasswordRequest) Reset() {
+	*x = ChangePasswordRequest{}
+	mi := &file_wc2026_auth_v1_auth_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChangePasswordRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChangePasswordRequest) ProtoMessage() {}
+
+func (x *ChangePasswordRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_wc2026_auth_v1_auth_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChangePasswordRequest.ProtoReflect.Descriptor instead.
+func (*ChangePasswordRequest) Descriptor() ([]byte, []int) {
+	return file_wc2026_auth_v1_auth_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ChangePasswordRequest) GetTempPassword() string {
+	if x != nil {
+		return x.TempPassword
+	}
+	return ""
+}
+
+func (x *ChangePasswordRequest) GetNewPassword() string {
+	if x != nil {
+		return x.NewPassword
+	}
+	return ""
+}
+
+type ChangePasswordResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChangePasswordResponse) Reset() {
+	*x = ChangePasswordResponse{}
+	mi := &file_wc2026_auth_v1_auth_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChangePasswordResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChangePasswordResponse) ProtoMessage() {}
+
+func (x *ChangePasswordResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_wc2026_auth_v1_auth_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChangePasswordResponse.ProtoReflect.Descriptor instead.
+func (*ChangePasswordResponse) Descriptor() ([]byte, []int) {
+	return file_wc2026_auth_v1_auth_proto_rawDescGZIP(), []int{9}
+}
+
 var File_wc2026_auth_v1_auth_proto protoreflect.FileDescriptor
 
 const file_wc2026_auth_v1_auth_proto_rawDesc = "" +
@@ -357,21 +541,32 @@ const file_wc2026_auth_v1_auth_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\"R\n" +
 	"\fLoginRequest\x12\x1d\n" +
 	"\x05email\x18\x01 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\x12#\n" +
-	"\bpassword\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\bpassword\"m\n" +
+	"\bpassword\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\bpassword\"\xa7\x01\n" +
 	"\rLoginResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x129\n" +
 	"\n" +
-	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x0e\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x128\n" +
+	"\x18password_change_required\x18\x03 \x01(\bR\x16passwordChangeRequired\"\x0e\n" +
 	"\fGetMeRequest\"\x87\x01\n" +
 	"\rGetMeResponse\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1b\n" +
 	"\tfull_name\x18\x02 \x01(\tR\bfullName\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12*\n" +
-	"\x11national_team_ids\x18\x04 \x03(\tR\x0fnationalTeamIds2\xe8\x01\n" +
+	"\x11national_team_ids\x18\x04 \x03(\tR\x0fnationalTeamIds\"?\n" +
+	"\x1eRequestPasswordRecoveryRequest\x12\x1d\n" +
+	"\x05email\x18\x01 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\";\n" +
+	"\x1fRequestPasswordRecoveryResponse\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"q\n" +
+	"\x15ChangePasswordRequest\x12,\n" +
+	"\rtemp_password\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\ftempPassword\x12*\n" +
+	"\fnew_password\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\bR\vnewPassword\"\x18\n" +
+	"\x16ChangePasswordResponse2\xc5\x03\n" +
 	"\vAuthService\x12M\n" +
 	"\bRegister\x12\x1f.wc2026.auth.v1.RegisterRequest\x1a .wc2026.auth.v1.RegisterResponse\x12D\n" +
 	"\x05Login\x12\x1c.wc2026.auth.v1.LoginRequest\x1a\x1d.wc2026.auth.v1.LoginResponse\x12D\n" +
-	"\x05GetMe\x12\x1c.wc2026.auth.v1.GetMeRequest\x1a\x1d.wc2026.auth.v1.GetMeResponseB@Z>github.com/rodrigorahman/wc_2026_api/gen/wc2026/auth/v1;authv1b\x06proto3"
+	"\x05GetMe\x12\x1c.wc2026.auth.v1.GetMeRequest\x1a\x1d.wc2026.auth.v1.GetMeResponse\x12z\n" +
+	"\x17RequestPasswordRecovery\x12..wc2026.auth.v1.RequestPasswordRecoveryRequest\x1a/.wc2026.auth.v1.RequestPasswordRecoveryResponse\x12_\n" +
+	"\x0eChangePassword\x12%.wc2026.auth.v1.ChangePasswordRequest\x1a&.wc2026.auth.v1.ChangePasswordResponseB@Z>github.com/rodrigorahman/wc_2026_api/gen/wc2026/auth/v1;authv1b\x06proto3"
 
 var (
 	file_wc2026_auth_v1_auth_proto_rawDescOnce sync.Once
@@ -385,29 +580,37 @@ func file_wc2026_auth_v1_auth_proto_rawDescGZIP() []byte {
 	return file_wc2026_auth_v1_auth_proto_rawDescData
 }
 
-var file_wc2026_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_wc2026_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_wc2026_auth_v1_auth_proto_goTypes = []any{
-	(*RegisterRequest)(nil),       // 0: wc2026.auth.v1.RegisterRequest
-	(*RegisterResponse)(nil),      // 1: wc2026.auth.v1.RegisterResponse
-	(*LoginRequest)(nil),          // 2: wc2026.auth.v1.LoginRequest
-	(*LoginResponse)(nil),         // 3: wc2026.auth.v1.LoginResponse
-	(*GetMeRequest)(nil),          // 4: wc2026.auth.v1.GetMeRequest
-	(*GetMeResponse)(nil),         // 5: wc2026.auth.v1.GetMeResponse
-	(*timestamppb.Timestamp)(nil), // 6: google.protobuf.Timestamp
+	(*RegisterRequest)(nil),                 // 0: wc2026.auth.v1.RegisterRequest
+	(*RegisterResponse)(nil),                // 1: wc2026.auth.v1.RegisterResponse
+	(*LoginRequest)(nil),                    // 2: wc2026.auth.v1.LoginRequest
+	(*LoginResponse)(nil),                   // 3: wc2026.auth.v1.LoginResponse
+	(*GetMeRequest)(nil),                    // 4: wc2026.auth.v1.GetMeRequest
+	(*GetMeResponse)(nil),                   // 5: wc2026.auth.v1.GetMeResponse
+	(*RequestPasswordRecoveryRequest)(nil),  // 6: wc2026.auth.v1.RequestPasswordRecoveryRequest
+	(*RequestPasswordRecoveryResponse)(nil), // 7: wc2026.auth.v1.RequestPasswordRecoveryResponse
+	(*ChangePasswordRequest)(nil),           // 8: wc2026.auth.v1.ChangePasswordRequest
+	(*ChangePasswordResponse)(nil),          // 9: wc2026.auth.v1.ChangePasswordResponse
+	(*timestamppb.Timestamp)(nil),           // 10: google.protobuf.Timestamp
 }
 var file_wc2026_auth_v1_auth_proto_depIdxs = []int32{
-	6, // 0: wc2026.auth.v1.LoginResponse.expires_at:type_name -> google.protobuf.Timestamp
-	0, // 1: wc2026.auth.v1.AuthService.Register:input_type -> wc2026.auth.v1.RegisterRequest
-	2, // 2: wc2026.auth.v1.AuthService.Login:input_type -> wc2026.auth.v1.LoginRequest
-	4, // 3: wc2026.auth.v1.AuthService.GetMe:input_type -> wc2026.auth.v1.GetMeRequest
-	1, // 4: wc2026.auth.v1.AuthService.Register:output_type -> wc2026.auth.v1.RegisterResponse
-	3, // 5: wc2026.auth.v1.AuthService.Login:output_type -> wc2026.auth.v1.LoginResponse
-	5, // 6: wc2026.auth.v1.AuthService.GetMe:output_type -> wc2026.auth.v1.GetMeResponse
-	4, // [4:7] is the sub-list for method output_type
-	1, // [1:4] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	10, // 0: wc2026.auth.v1.LoginResponse.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 1: wc2026.auth.v1.AuthService.Register:input_type -> wc2026.auth.v1.RegisterRequest
+	2,  // 2: wc2026.auth.v1.AuthService.Login:input_type -> wc2026.auth.v1.LoginRequest
+	4,  // 3: wc2026.auth.v1.AuthService.GetMe:input_type -> wc2026.auth.v1.GetMeRequest
+	6,  // 4: wc2026.auth.v1.AuthService.RequestPasswordRecovery:input_type -> wc2026.auth.v1.RequestPasswordRecoveryRequest
+	8,  // 5: wc2026.auth.v1.AuthService.ChangePassword:input_type -> wc2026.auth.v1.ChangePasswordRequest
+	1,  // 6: wc2026.auth.v1.AuthService.Register:output_type -> wc2026.auth.v1.RegisterResponse
+	3,  // 7: wc2026.auth.v1.AuthService.Login:output_type -> wc2026.auth.v1.LoginResponse
+	5,  // 8: wc2026.auth.v1.AuthService.GetMe:output_type -> wc2026.auth.v1.GetMeResponse
+	7,  // 9: wc2026.auth.v1.AuthService.RequestPasswordRecovery:output_type -> wc2026.auth.v1.RequestPasswordRecoveryResponse
+	9,  // 10: wc2026.auth.v1.AuthService.ChangePassword:output_type -> wc2026.auth.v1.ChangePasswordResponse
+	6,  // [6:11] is the sub-list for method output_type
+	1,  // [1:6] is the sub-list for method input_type
+	1,  // [1:1] is the sub-list for extension type_name
+	1,  // [1:1] is the sub-list for extension extendee
+	0,  // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_wc2026_auth_v1_auth_proto_init() }
@@ -421,7 +624,7 @@ func file_wc2026_auth_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_wc2026_auth_v1_auth_proto_rawDesc), len(file_wc2026_auth_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

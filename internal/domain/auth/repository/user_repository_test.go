@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -220,11 +221,11 @@ func TestMigration000004_Down_RevertsTo1to1(t *testing.T) {
 	dsn := t.TempDir() + "/down.db"
 	migrator, db := testutil.NewMigratorForTest(t, dsn)
 
-	// Migrate fully up, then step down past 000008 (seed Copa), 000007 (create
-	// matches), 000006 (add code), 000005 (add flag_url) and 000004 to assert
-	// 000004's down behaviour (the 1:1 schema revert).
+	// Migrate fully up, then step down past 000009 (add temp password), 000008
+	// (seed Copa), 000007 (create matches), 000006 (add code), 000005 (add
+	// flag_url) and 000004 to assert 000004's down behaviour (the 1:1 schema revert).
 	require.NoError(t, migrator.Up())
-	require.NoError(t, migrator.Steps(-5))
+	require.NoError(t, migrator.Steps(-6))
 
 	// national_team_id is back in users.
 	var hasNationalTeamID int
@@ -269,4 +270,147 @@ func TestUserRepository_GetUserByEmail_NotFound(t *testing.T) {
 	_, err := repo.GetUserByEmail(ctx, "nobody@example.com")
 	require.Error(t, err)
 	require.True(t, errors.Is(err, repository.ErrUserNotFound), "error must unwrap to ErrUserNotFound")
+}
+
+// tempExpiresAt is a fixed timestamp used by the temporary-password tests. It is
+// truncated to whole seconds and kept in UTC so the value survives the SQLite
+// TIMESTAMP round-trip without precision drift.
+var tempExpiresAt = time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+
+// CT-018 — SetTempPassword persists the hash and expiration; a GetUserByID
+// round-trip returns exactly what was written.
+func TestSetTempPassword_PersisteEExpiresAt(t *testing.T) {
+	ctx := context.Background()
+	repo := newRepo(t)
+
+	u := baseUser()
+	_, err := repo.CreateUser(ctx, u)
+	require.NoError(t, err)
+
+	err = repo.SetTempPassword(ctx, u.ID, "$2a$12$temphash", tempExpiresAt)
+	require.NoError(t, err)
+
+	got, err := repo.GetUserByID(ctx, u.ID)
+	require.NoError(t, err)
+	require.Equal(t, "$2a$12$temphash", got.TempPasswordHash)
+	require.True(t, got.TempPasswordExpiresAt.Equal(tempExpiresAt),
+		"expires_at round-trip: want %v, got %v", tempExpiresAt, got.TempPasswordExpiresAt)
+}
+
+// CT-019 — SetTempPassword on a non-existent id affects 0 rows and reports
+// ErrUserNotFound (only possible because the query is :execrows).
+func TestSetTempPassword_IDInexistente_ErrUserNotFound(t *testing.T) {
+	ctx := context.Background()
+	repo := newRepo(t)
+
+	err := repo.SetTempPassword(ctx, "id-invalido", "$2a$12$temphash", tempExpiresAt)
+	require.Error(t, err)
+	require.True(t, errors.Is(err, repository.ErrUserNotFound), "error must unwrap to ErrUserNotFound")
+}
+
+// CT-020 — UpdatePassword writes the new permanent hash and clears the temp
+// columns in the same statement.
+func TestUpdatePassword_GravaEZeraTemp(t *testing.T) {
+	ctx := context.Background()
+	repo := newRepo(t)
+
+	u := baseUser()
+	_, err := repo.CreateUser(ctx, u)
+	require.NoError(t, err)
+
+	err = repo.SetTempPassword(ctx, u.ID, "$2a$12$temphash", tempExpiresAt)
+	require.NoError(t, err)
+
+	err = repo.UpdatePassword(ctx, u.ID, "$2a$12$newhash")
+	require.NoError(t, err)
+
+	got, err := repo.GetUserByID(ctx, u.ID)
+	require.NoError(t, err)
+	require.Equal(t, "$2a$12$newhash", got.PasswordHash)
+	require.Equal(t, "", got.TempPasswordHash)
+	require.True(t, got.TempPasswordExpiresAt.IsZero(), "temp expires_at must be cleared to zero value")
+}
+
+// CT-019 (companion) — UpdatePassword on a non-existent id reports ErrUserNotFound.
+func TestUpdatePassword_IDInexistente_ErrUserNotFound(t *testing.T) {
+	ctx := context.Background()
+	repo := newRepo(t)
+
+	err := repo.UpdatePassword(ctx, "id-invalido", "$2a$12$newhash")
+	require.Error(t, err)
+	require.True(t, errors.Is(err, repository.ErrUserNotFound), "error must unwrap to ErrUserNotFound")
+}
+
+// CT-021 — both GetUserByEmail and GetUserByID read back the temp columns.
+func TestGetUserBy_RetornamCamposTemp(t *testing.T) {
+	ctx := context.Background()
+	repo := newRepo(t)
+
+	u := baseUser()
+	_, err := repo.CreateUser(ctx, u)
+	require.NoError(t, err)
+
+	err = repo.SetTempPassword(ctx, u.ID, "$2a$12$temphash", tempExpiresAt)
+	require.NoError(t, err)
+
+	byEmail, err := repo.GetUserByEmail(ctx, u.Email)
+	require.NoError(t, err)
+	require.Equal(t, "$2a$12$temphash", byEmail.TempPasswordHash)
+	require.True(t, byEmail.TempPasswordExpiresAt.Equal(tempExpiresAt))
+
+	byID, err := repo.GetUserByID(ctx, u.ID)
+	require.NoError(t, err)
+	require.Equal(t, "$2a$12$temphash", byID.TempPasswordHash)
+	require.True(t, byID.TempPasswordExpiresAt.Equal(tempExpiresAt))
+}
+
+// CT-022 — a user with no recovery in progress yields zero-value temp fields
+// (NULL → "" / time.Time{}) without error.
+func TestGetUserByEmail_SemRecovery_ZeroValues(t *testing.T) {
+	ctx := context.Background()
+	repo := newRepo(t)
+
+	u := baseUser()
+	_, err := repo.CreateUser(ctx, u)
+	require.NoError(t, err)
+
+	got, err := repo.GetUserByEmail(ctx, u.Email)
+	require.NoError(t, err)
+	require.Equal(t, "", got.TempPasswordHash)
+	require.True(t, got.TempPasswordExpiresAt.IsZero())
+}
+
+// CT-035 — migration 000009 keeps insertions working and leaves temp fields
+// zeroed for newly created users.
+func TestMigracao000009_ColunasNullable(t *testing.T) {
+	ctx := context.Background()
+	repo := newRepo(t)
+
+	u := baseUser()
+	_, err := repo.CreateUser(ctx, u)
+	require.NoError(t, err)
+
+	got, err := repo.GetUserByID(ctx, u.ID)
+	require.NoError(t, err)
+	require.Equal(t, "", got.TempPasswordHash)
+	require.True(t, got.TempPasswordExpiresAt.IsZero())
+}
+
+// CT-038 — regression guard: a row inserted directly via SQL leaving the temp
+// columns as NULL must scan into zero values without panic or error.
+func TestGetUserByID_ScanNullTempNaoQuebra(t *testing.T) {
+	ctx := context.Background()
+	repo, db := newRepoDB(t)
+
+	id := uuid.NewString()
+	_, err := db.ExecContext(ctx,
+		"INSERT INTO users (id, full_name, email, password_hash) VALUES (?, ?, ?, ?)",
+		id, "Maria Souza", "maria@example.com", "$2a$12$hashdummy")
+	require.NoError(t, err)
+
+	got, err := repo.GetUserByID(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, id, got.ID)
+	require.Equal(t, "", got.TempPasswordHash)
+	require.True(t, got.TempPasswordExpiresAt.IsZero())
 }

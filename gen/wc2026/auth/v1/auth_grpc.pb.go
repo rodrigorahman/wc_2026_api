@@ -19,9 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AuthService_Register_FullMethodName = "/wc2026.auth.v1.AuthService/Register"
-	AuthService_Login_FullMethodName    = "/wc2026.auth.v1.AuthService/Login"
-	AuthService_GetMe_FullMethodName    = "/wc2026.auth.v1.AuthService/GetMe"
+	AuthService_Register_FullMethodName                = "/wc2026.auth.v1.AuthService/Register"
+	AuthService_Login_FullMethodName                   = "/wc2026.auth.v1.AuthService/Login"
+	AuthService_GetMe_FullMethodName                   = "/wc2026.auth.v1.AuthService/GetMe"
+	AuthService_RequestPasswordRecovery_FullMethodName = "/wc2026.auth.v1.AuthService/RequestPasswordRecovery"
+	AuthService_ChangePassword_FullMethodName          = "/wc2026.auth.v1.AuthService/ChangePassword"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -31,6 +33,8 @@ type AuthServiceClient interface {
 	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterResponse, error)
 	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error)
 	GetMe(ctx context.Context, in *GetMeRequest, opts ...grpc.CallOption) (*GetMeResponse, error)
+	RequestPasswordRecovery(ctx context.Context, in *RequestPasswordRecoveryRequest, opts ...grpc.CallOption) (*RequestPasswordRecoveryResponse, error)
+	ChangePassword(ctx context.Context, in *ChangePasswordRequest, opts ...grpc.CallOption) (*ChangePasswordResponse, error)
 }
 
 type authServiceClient struct {
@@ -71,6 +75,26 @@ func (c *authServiceClient) GetMe(ctx context.Context, in *GetMeRequest, opts ..
 	return out, nil
 }
 
+func (c *authServiceClient) RequestPasswordRecovery(ctx context.Context, in *RequestPasswordRecoveryRequest, opts ...grpc.CallOption) (*RequestPasswordRecoveryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RequestPasswordRecoveryResponse)
+	err := c.cc.Invoke(ctx, AuthService_RequestPasswordRecovery_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ChangePassword(ctx context.Context, in *ChangePasswordRequest, opts ...grpc.CallOption) (*ChangePasswordResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChangePasswordResponse)
+	err := c.cc.Invoke(ctx, AuthService_ChangePassword_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations should embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -78,6 +102,8 @@ type AuthServiceServer interface {
 	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
 	Login(context.Context, *LoginRequest) (*LoginResponse, error)
 	GetMe(context.Context, *GetMeRequest) (*GetMeResponse, error)
+	RequestPasswordRecovery(context.Context, *RequestPasswordRecoveryRequest) (*RequestPasswordRecoveryResponse, error)
+	ChangePassword(context.Context, *ChangePasswordRequest) (*ChangePasswordResponse, error)
 }
 
 // UnimplementedAuthServiceServer should be embedded to have
@@ -95,6 +121,12 @@ func (UnimplementedAuthServiceServer) Login(context.Context, *LoginRequest) (*Lo
 }
 func (UnimplementedAuthServiceServer) GetMe(context.Context, *GetMeRequest) (*GetMeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMe not implemented")
+}
+func (UnimplementedAuthServiceServer) RequestPasswordRecovery(context.Context, *RequestPasswordRecoveryRequest) (*RequestPasswordRecoveryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestPasswordRecovery not implemented")
+}
+func (UnimplementedAuthServiceServer) ChangePassword(context.Context, *ChangePasswordRequest) (*ChangePasswordResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ChangePassword not implemented")
 }
 func (UnimplementedAuthServiceServer) testEmbeddedByValue() {}
 
@@ -170,6 +202,42 @@ func _AuthService_GetMe_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_RequestPasswordRecovery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestPasswordRecoveryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).RequestPasswordRecovery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_RequestPasswordRecovery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).RequestPasswordRecovery(ctx, req.(*RequestPasswordRecoveryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ChangePassword_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChangePasswordRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ChangePassword(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ChangePassword_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ChangePassword(ctx, req.(*ChangePasswordRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -188,6 +256,14 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMe",
 			Handler:    _AuthService_GetMe_Handler,
+		},
+		{
+			MethodName: "RequestPasswordRecovery",
+			Handler:    _AuthService_RequestPasswordRecovery_Handler,
+		},
+		{
+			MethodName: "ChangePassword",
+			Handler:    _AuthService_ChangePassword_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

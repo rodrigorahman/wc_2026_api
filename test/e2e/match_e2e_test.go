@@ -18,7 +18,7 @@ import (
 // codes.Unauthenticated, provando que o RPC não é público.
 func TestE2E_ListUpcomingMatches_NoToken_Unauthenticated(t *testing.T) {
 	ctx := context.Background()
-	conn := testutil.TestNewBufconnServer(t, nil)
+	conn := testutil.TestNewBufconnServer(t, nil, nil)
 	client := matchv1.NewMatchServiceClient(conn)
 
 	_, err := client.ListUpcomingMatches(ctx, &matchv1.ListUpcomingMatchesRequest{})
@@ -31,7 +31,7 @@ func TestE2E_ListUpcomingMatches_NoToken_Unauthenticated(t *testing.T) {
 // (não erro), provando que vazio != erro ponta a ponta mesmo com o seed de jogos.
 func TestE2E_ListUpcomingMatches_AuthenticatedNoFavorites_Empty(t *testing.T) {
 	ctx := context.Background()
-	conn := testutil.TestNewBufconnServer(t, nil)
+	conn := testutil.TestNewBufconnServer(t, nil, nil)
 
 	authClient := authv1.NewAuthServiceClient(conn)
 	matchClient := matchv1.NewMatchServiceClient(conn)

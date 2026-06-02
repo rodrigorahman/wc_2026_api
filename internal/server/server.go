@@ -80,12 +80,14 @@ func provideValidator() (protovalidate.Validator, error) {
 
 // providePublicMethods returns the RPCs that bypass JWT authentication. The
 // values are the generated FullMethodName constants (never string literals) so a
-// typo cannot silently fail open. GetMe is intentionally absent — it is the
-// protected reference RPC.
+// typo cannot silently fail open. GetMe and ChangePassword are intentionally
+// absent — they require a valid JWT (ChangePassword authenticates the temporary
+// password through the protected channel).
 func providePublicMethods() []string {
 	return []string{
 		authv1.AuthService_Register_FullMethodName,
 		authv1.AuthService_Login_FullMethodName,
+		authv1.AuthService_RequestPasswordRecovery_FullMethodName,
 		nationalteamv1.NationalTeamService_ListNationalTeams_FullMethodName,
 	}
 }

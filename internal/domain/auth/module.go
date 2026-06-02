@@ -14,9 +14,11 @@ package auth
 import (
 	"context"
 	"errors"
+	"time"
 
 	"buf.build/go/protovalidate"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
 	"github.com/rodrigorahman/wc_2026_api/internal/domain/auth/handler"
@@ -26,6 +28,7 @@ import (
 	"github.com/rodrigorahman/wc_2026_api/internal/domain/auth/token"
 	"github.com/rodrigorahman/wc_2026_api/internal/infra/clock"
 	"github.com/rodrigorahman/wc_2026_api/internal/infra/config"
+	"github.com/rodrigorahman/wc_2026_api/internal/infra/email"
 )
 
 // Module wires the auth domain. Constructors are provided as concrete types and
@@ -43,6 +46,7 @@ var Module = fx.Module("auth",
 		provideServiceTokenManager,
 		repository.NewUserRepository,
 		provideServiceUserRepository,
+		provideEmailSender,
 		provideAuthService,
 		provideAuthHandler,
 		fx.Annotate(
@@ -77,9 +81,22 @@ func provideAuthService(
 	users service.UserRepository,
 	nationalTeams service.NationalTeamRepository,
 	tokens service.TokenManager,
+	emailSender service.EmailSender,
 	clk clock.Clock,
+	logger *zap.Logger,
 ) (*service.AuthService, error) {
-	return service.NewAuthService(users, nationalTeams, tokens, clk, 0)
+	return service.NewAuthService(users, nationalTeams, tokens, emailSender, clk, logger, 0)
+}
+
+// provideEmailSender selects the EmailSender by configuration: an empty
+// ResendAPIKey (development — config's fail-fast guarantees production has the
+// key) binds the NoopSender that logs the destination and drops the body; a
+// present key binds the production ResendSender.
+func provideEmailSender(cfg config.Config, logger *zap.Logger) service.EmailSender {
+	if cfg.ResendAPIKey == "" {
+		return email.NewNoopSender(logger)
+	}
+	return email.NewResendSender(cfg.ResendAPIKey, cfg.ResendFromEmail, logger)
 }
 
 // provideAuthHandler adapts the concrete *service.AuthService to the narrow
@@ -147,11 +164,13 @@ func (a userRepositoryAdapter) GetUserByEmail(ctx context.Context, email string)
 	}
 
 	return service.User{
-		ID:              u.ID,
-		FullName:        u.FullName,
-		Email:           u.Email,
-		PasswordHash:    u.PasswordHash,
-		NationalTeamIDs: u.NationalTeamIDs,
+		ID:                    u.ID,
+		FullName:              u.FullName,
+		Email:                 u.Email,
+		PasswordHash:          u.PasswordHash,
+		TempPasswordHash:      u.TempPasswordHash,
+		TempPasswordExpiresAt: u.TempPasswordExpiresAt,
+		NationalTeamIDs:       u.NationalTeamIDs,
 	}, nil
 }
 
@@ -167,12 +186,36 @@ func (a userRepositoryAdapter) GetUserByID(ctx context.Context, id string) (serv
 	}
 
 	return service.User{
-		ID:              u.ID,
-		FullName:        u.FullName,
-		Email:           u.Email,
-		PasswordHash:    u.PasswordHash,
-		NationalTeamIDs: u.NationalTeamIDs,
+		ID:                    u.ID,
+		FullName:              u.FullName,
+		Email:                 u.Email,
+		PasswordHash:          u.PasswordHash,
+		TempPasswordHash:      u.TempPasswordHash,
+		TempPasswordExpiresAt: u.TempPasswordExpiresAt,
+		NationalTeamIDs:       u.NationalTeamIDs,
 	}, nil
+}
+
+// SetTempPassword forwards to the concrete repository and translates the
+// repository's not-found sentinel into the service's at the single translation
+// point.
+func (a userRepositoryAdapter) SetTempPassword(ctx context.Context, id, hash string, expiresAt time.Time) error {
+	err := a.repo.SetTempPassword(ctx, id, hash, expiresAt)
+	if errors.Is(err, repository.ErrUserNotFound) {
+		return service.ErrUserNotFound
+	}
+	return err
+}
+
+// UpdatePassword forwards to the concrete repository and translates the
+// repository's not-found sentinel into the service's at the single translation
+// point.
+func (a userRepositoryAdapter) UpdatePassword(ctx context.Context, id, hash string) error {
+	err := a.repo.UpdatePassword(ctx, id, hash)
+	if errors.Is(err, repository.ErrUserNotFound) {
+		return service.ErrUserNotFound
+	}
+	return err
 }
 
 // Compile-time assertions that the wiring binds satisfy their interfaces.

@@ -22,12 +22,14 @@ var ErrUserNotFound = errors.New("user not found")
 // Go (English) conventions; the mapping to/from pt-BR database columns is
 // performed by sqlc-generated code.
 type User struct {
-	ID              string
-	FullName        string
-	Email           string
-	PasswordHash    string
-	NationalTeamIDs []string
-	CreatedAt       time.Time
+	ID                    string
+	FullName              string
+	Email                 string
+	PasswordHash          string
+	TempPasswordHash      string
+	TempPasswordExpiresAt time.Time
+	NationalTeamIDs       []string
+	CreatedAt             time.Time
 }
 
 // UserRepository persists and retrieves users using sqlc-generated queries.
@@ -117,6 +119,41 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id string) (User, erro
 	return r.withNationalTeams(ctx, toUser(row))
 }
 
+// SetTempPassword stores a temporary-password hash and its expiration for the
+// user with the given id. Returns ErrUserNotFound (wrapped) when no row is
+// updated so callers can branch with errors.Is(err, ErrUserNotFound).
+func (r *UserRepository) SetTempPassword(ctx context.Context, id string, hash string, expiresAt time.Time) error {
+	rows, err := r.q.SetTempPassword(ctx, sqlc.SetTempPasswordParams{
+		TempPasswordHash:      sql.NullString{String: hash, Valid: true},
+		TempPasswordExpiresAt: sql.NullTime{Time: expiresAt, Valid: true},
+		ID:                    id,
+	})
+	if err != nil {
+		return fmt.Errorf("set temp password: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("set temp password: %w", ErrUserNotFound)
+	}
+	return nil
+}
+
+// UpdatePassword replaces the permanent password hash for the user with the
+// given id and clears any pending temporary password atomically. Returns
+// ErrUserNotFound (wrapped) when no row is updated.
+func (r *UserRepository) UpdatePassword(ctx context.Context, id string, hash string) error {
+	rows, err := r.q.UpdatePassword(ctx, sqlc.UpdatePasswordParams{
+		PasswordHash: hash,
+		ID:           id,
+	})
+	if err != nil {
+		return fmt.Errorf("update password: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("update password: %w", ErrUserNotFound)
+	}
+	return nil
+}
+
 // withNationalTeams populates u.NationalTeamIDs from the user_national_teams table.
 func (r *UserRepository) withNationalTeams(ctx context.Context, u User) (User, error) {
 	teamIDs, err := r.q.ListUserNationalTeams(ctx, u.ID)
@@ -131,10 +168,12 @@ func (r *UserRepository) withNationalTeams(ctx context.Context, u User) (User, e
 // national-team list is populated separately via ListUserNationalTeams.
 func toUser(row sqlc.User) User {
 	return User{
-		ID:           row.ID,
-		FullName:     row.FullName,
-		Email:        row.Email,
-		PasswordHash: row.PasswordHash,
-		CreatedAt:    row.CreatedAt,
+		ID:                    row.ID,
+		FullName:              row.FullName,
+		Email:                 row.Email,
+		PasswordHash:          row.PasswordHash,
+		TempPasswordHash:      row.TempPasswordHash.String,
+		TempPasswordExpiresAt: row.TempPasswordExpiresAt.Time,
+		CreatedAt:             row.CreatedAt,
 	}
 }

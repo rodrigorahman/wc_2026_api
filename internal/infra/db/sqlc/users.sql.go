@@ -7,6 +7,7 @@ package sqlc
 
 import (
 	"context"
+	"database/sql"
 )
 
 const addUserNationalTeam = `-- name: AddUserNationalTeam :exec
@@ -27,7 +28,7 @@ func (q *Queries) AddUserNationalTeam(ctx context.Context, arg AddUserNationalTe
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, full_name, email, password_hash)
 VALUES (?, ?, ?, ?)
-RETURNING id, full_name, email, password_hash, created_at
+RETURNING id, full_name, email, password_hash, created_at, temp_password_hash, temp_password_expires_at
 `
 
 type CreateUserParams struct {
@@ -51,12 +52,14 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 		&i.PasswordHash,
 		&i.CreatedAt,
+		&i.TempPasswordHash,
+		&i.TempPasswordExpiresAt,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, full_name, email, password_hash, created_at
+SELECT id, full_name, email, password_hash, created_at, temp_password_hash, temp_password_expires_at
 FROM users
 WHERE email = ?
 `
@@ -70,12 +73,14 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Email,
 		&i.PasswordHash,
 		&i.CreatedAt,
+		&i.TempPasswordHash,
+		&i.TempPasswordExpiresAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, full_name, email, password_hash, created_at
+SELECT id, full_name, email, password_hash, created_at, temp_password_hash, temp_password_expires_at
 FROM users
 WHERE id = ?
 `
@@ -89,6 +94,8 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
 		&i.Email,
 		&i.PasswordHash,
 		&i.CreatedAt,
+		&i.TempPasswordHash,
+		&i.TempPasswordExpiresAt,
 	)
 	return i, err
 }
@@ -120,4 +127,43 @@ func (q *Queries) ListUserNationalTeams(ctx context.Context, userID string) ([]s
 		return nil, err
 	}
 	return items, nil
+}
+
+const setTempPassword = `-- name: SetTempPassword :execrows
+UPDATE users
+SET temp_password_hash = ?, temp_password_expires_at = ?
+WHERE id = ?
+`
+
+type SetTempPasswordParams struct {
+	TempPasswordHash      sql.NullString
+	TempPasswordExpiresAt sql.NullTime
+	ID                    string
+}
+
+func (q *Queries) SetTempPassword(ctx context.Context, arg SetTempPasswordParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, setTempPassword, arg.TempPasswordHash, arg.TempPasswordExpiresAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updatePassword = `-- name: UpdatePassword :execrows
+UPDATE users
+SET password_hash = ?, temp_password_hash = NULL, temp_password_expires_at = NULL
+WHERE id = ?
+`
+
+type UpdatePasswordParams struct {
+	PasswordHash string
+	ID           string
+}
+
+func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updatePassword, arg.PasswordHash, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

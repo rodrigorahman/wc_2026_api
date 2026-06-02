@@ -11,6 +11,8 @@ service AuthService {
   rpc Register(RegisterRequest) returns (RegisterResponse);
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc GetMe(GetMeRequest) returns (GetMeResponse);
+  rpc RequestPasswordRecovery(RequestPasswordRecoveryRequest) returns (RequestPasswordRecoveryResponse);
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
 }
 
 message RegisterRequest {
@@ -44,6 +46,7 @@ message LoginRequest {
 message LoginResponse {
   string access_token = 1;
   google.protobuf.Timestamp expires_at = 2;
+  bool password_change_required = 3;
 }
 
 message GetMeRequest {}
@@ -54,3 +57,18 @@ message GetMeResponse {
   string email = 3;
   repeated string national_team_ids = 4;
 }
+
+message RequestPasswordRecoveryRequest {
+  string email = 1 [(buf.validate.field).string.email = true];
+}
+
+message RequestPasswordRecoveryResponse {
+  string message = 1;
+}
+
+message ChangePasswordRequest {
+  string temp_password = 1 [(buf.validate.field).string = { min_len: 1 }];
+  string new_password  = 2 [(buf.validate.field).string = { min_len: 8 }];
+}
+
+message ChangePasswordResponse {}

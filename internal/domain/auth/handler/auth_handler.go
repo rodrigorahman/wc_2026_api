@@ -24,7 +24,12 @@ type AuthService interface {
 	Register(ctx context.Context, params service.RegisterParams) (string, error)
 	Login(ctx context.Context, email, password string) (service.LoginResult, error)
 	GetUser(ctx context.Context, id string) (service.User, error)
+	RequestPasswordRecovery(ctx context.Context, email string) (string, error)
+	ChangePassword(ctx context.Context, userID, tempPassword, newPassword string) error
 }
+
+// compile-time assertion: *service.AuthService must satisfy handler.AuthService.
+var _ AuthService = (*service.AuthService)(nil)
 
 // AuthHandler implements the generated AuthServiceServer by mapping proto
 // requests to domain calls and domain results back to proto responses.
@@ -65,8 +70,9 @@ func (h *AuthHandler) Login(ctx context.Context, req *authv1.LoginRequest) (*aut
 	}
 
 	return &authv1.LoginResponse{
-		AccessToken: result.AccessToken,
-		ExpiresAt:   timestamppb.New(result.ExpiresAt),
+		AccessToken:            result.AccessToken,
+		ExpiresAt:              timestamppb.New(result.ExpiresAt),
+		PasswordChangeRequired: result.PasswordChangeRequired,
 	}, nil
 }
 
@@ -92,4 +98,32 @@ func (h *AuthHandler) GetMe(ctx context.Context, _ *authv1.GetMeRequest) (*authv
 		Email:           user.Email,
 		NationalTeamIds: user.NationalTeamIDs,
 	}, nil
+}
+
+// RequestPasswordRecovery delegates to the service and returns its generic,
+// account-agnostic message immediately. Service errors are propagated unchanged.
+func (h *AuthHandler) RequestPasswordRecovery(ctx context.Context, req *authv1.RequestPasswordRecoveryRequest) (*authv1.RequestPasswordRecoveryResponse, error) {
+	msg, err := h.svc.RequestPasswordRecovery(ctx, req.GetEmail())
+	if err != nil {
+		return nil, err
+	}
+
+	return &authv1.RequestPasswordRecoveryResponse{Message: msg}, nil
+}
+
+// ChangePassword reads the authenticated user id (sub claim) injected into the
+// context by the JWT interceptor, then delegates to the service. A missing
+// subject means the RPC reached the handler without authentication, which is an
+// internal wiring fault. Service errors are propagated unchanged.
+func (h *AuthHandler) ChangePassword(ctx context.Context, req *authv1.ChangePasswordRequest) (*authv1.ChangePasswordResponse, error) {
+	sub, ok := interceptor.SubjectFromContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "não autenticado")
+	}
+
+	if err := h.svc.ChangePassword(ctx, sub, req.GetTempPassword(), req.GetNewPassword()); err != nil {
+		return nil, err
+	}
+
+	return &authv1.ChangePasswordResponse{}, nil
 }

@@ -38,6 +38,15 @@ type Config struct {
 	// Defaults to "production" so that introspection surfaces (e.g. gRPC
 	// reflection) stay off unless a dev environment is explicitly declared.
 	Env string
+
+	// ResendAPIKey is the secret API key used to send transactional e-mails
+	// via Resend. Required outside development; empty in development selects
+	// the NoopSender at wiring time.
+	ResendAPIKey string
+
+	// ResendFromEmail is the sender address used for Resend e-mails.
+	// Required whenever ResendAPIKey is set — without it there is no sender.
+	ResendFromEmail string
 }
 
 // IsDevelopment reports whether the application is running in a development
@@ -83,12 +92,30 @@ func Load() (Config, error) {
 		}
 	}
 
+	env := v.GetString("APP_ENV")
+	resendAPIKey := v.GetString("RESEND_API_KEY")
+	resendFromEmail := v.GetString("RESEND_FROM_EMAIL")
+
+	isDevelopment := env == "dev" || env == "development"
+	if !isDevelopment && resendAPIKey == "" {
+		return Config{}, fmt.Errorf(
+			"RESEND_API_KEY ausente: obrigatório fora de desenvolvimento — configure a variável de ambiente RESEND_API_KEY",
+		)
+	}
+	if resendAPIKey != "" && resendFromEmail == "" {
+		return Config{}, fmt.Errorf(
+			"RESEND_FROM_EMAIL ausente: obrigatório quando RESEND_API_KEY está presente — configure a variável de ambiente RESEND_FROM_EMAIL",
+		)
+	}
+
 	return Config{
-		DBPath:    dbPath,
-		JWTSecret: secret,
-		JWTTTL:    ttl,
-		GRPCPort:  v.GetString("GRPC_PORT"),
-		Env:       v.GetString("APP_ENV"),
+		DBPath:          dbPath,
+		JWTSecret:       secret,
+		JWTTTL:          ttl,
+		GRPCPort:        v.GetString("GRPC_PORT"),
+		Env:             env,
+		ResendAPIKey:    resendAPIKey,
+		ResendFromEmail: resendFromEmail,
 	}, nil
 }
 

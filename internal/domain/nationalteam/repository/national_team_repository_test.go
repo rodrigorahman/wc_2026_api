@@ -75,9 +75,9 @@ func TestIntegration_FlagURLColumn_ExistsNotNull(t *testing.T) {
 
 // CT-002: a down migration 000005 remove a coluna flag_url (DROP COLUMN
 // suportado pelo driver modernc), exercitada pelo mesmo migrator de produção.
-// Após 000008 (seed Copa), 000007 (cria matches) e 000006 (que adiciona `code`),
-// reverter até 000005 exige quatro passos: Steps(-4) desfaz 000008, 000007, 000006
-// e em seguida 000005.
+// Após 000009 (temp password), 000008 (seed Copa), 000007 (cria matches) e 000006
+// (que adiciona `code`), reverter até 000005 exige cinco passos: Steps(-5) desfaz
+// 000009, 000008, 000007, 000006 e em seguida 000005.
 func TestIntegration_FlagURLColumn_DownRemovesColumn(t *testing.T) {
 	ctx := context.Background()
 
@@ -92,7 +92,7 @@ func TestIntegration_FlagURLColumn_DownRemovesColumn(t *testing.T) {
 		Scan(&beforeDown))
 	require.Equal(t, 1, beforeDown, "flag_url must exist before down")
 
-	require.NoError(t, migrator.Steps(-4))
+	require.NoError(t, migrator.Steps(-5))
 
 	var afterDown int
 	require.NoError(t, db.QueryRowContext(ctx,
@@ -232,7 +232,7 @@ func TestIntegration_Backfill_CodesBySeedID(t *testing.T) {
 // CT-T1-003: a down migration 000006 remove a coluna code (DROP COLUMN
 // suportado pelo driver modernc), exercitada pelo mesmo migrator de produção.
 // Após 000008 (seed Copa) e 000007 (cria matches) virarem o topo da pilha,
-// reverter até 000006 exige três passos: Steps(-3) desfaz 000008, 000007 e em seguida 000006.
+// reverter até 000006 exige quatro passos: Steps(-4) desfaz 000009, 000008, 000007 e em seguida 000006.
 func TestIntegration_CodeColumn_DownRemovesColumn(t *testing.T) {
 	ctx := context.Background()
 
@@ -247,7 +247,7 @@ func TestIntegration_CodeColumn_DownRemovesColumn(t *testing.T) {
 		Scan(&beforeDown))
 	require.Equal(t, 1, beforeDown, "code must exist before down")
 
-	require.NoError(t, migrator.Steps(-3))
+	require.NoError(t, migrator.Steps(-4))
 
 	var afterDown int
 	require.NoError(t, db.QueryRowContext(ctx,

@@ -8,12 +8,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/rodrigorahman/wc_2026_api/internal/domain/auth"
+	"github.com/rodrigorahman/wc_2026_api/internal/domain/auth/repository"
 	"github.com/rodrigorahman/wc_2026_api/internal/domain/auth/service"
 	"github.com/rodrigorahman/wc_2026_api/internal/domain/auth/token"
 	"github.com/rodrigorahman/wc_2026_api/internal/domain/match"
@@ -21,8 +23,10 @@ import (
 	"github.com/rodrigorahman/wc_2026_api/internal/infra/config"
 	"github.com/rodrigorahman/wc_2026_api/internal/infra/db"
 	"github.com/rodrigorahman/wc_2026_api/internal/infra/db/sqlc"
+	"github.com/rodrigorahman/wc_2026_api/internal/infra/email"
 	"github.com/rodrigorahman/wc_2026_api/internal/domain/nationalteam"
 	"github.com/rodrigorahman/wc_2026_api/internal/server"
+	"github.com/rodrigorahman/wc_2026_api/internal/testutil"
 )
 
 // seededBrasilID and seededArgentinaID are national-team ids present in the seed
@@ -237,6 +241,100 @@ func TestIntegration_FxWiring_Smoke(t *testing.T) {
 		fx.Invoke(func(*grpc.Server) {}),
 	)
 	require.NoError(t, err)
+}
+
+// CT-W1 — provideEmailSender with an empty ResendAPIKey (development) binds the
+// NoopSender. Asserts the concrete type, not interface satisfaction.
+func TestProvideEmailSender_DevSemKey_Noop(t *testing.T) {
+	sender := auth.ProvideEmailSender(config.Config{ResendAPIKey: ""}, zap.NewNop())
+
+	require.IsType(t, &email.NoopSender{}, sender)
+}
+
+// CT-W2 — provideEmailSender with a present ResendAPIKey binds the production
+// ResendSender. Asserts the concrete type.
+func TestProvideEmailSender_ComKey_Resend(t *testing.T) {
+	sender := auth.ProvideEmailSender(
+		config.Config{ResendAPIKey: "re_k", ResendFromEmail: "sender@example.com"},
+		zap.NewNop(),
+	)
+
+	require.IsType(t, &email.ResendSender{}, sender)
+}
+
+// CT-W3 — the adapter copies TempPasswordHash and TempPasswordExpiresAt from the
+// repository.User into the service.User (guard for the §3.2 propagation bug).
+// Exercised through the real concrete repository over SQLite (boundary real):
+// the temp password set on the row must surface, byte-for-byte, on the
+// service.User the adapter returns.
+func TestAdapter_PropagaCamposTemp(t *testing.T) {
+	ctx := context.Background()
+	dbConn := testutil.TestNewDB(t)
+	repo := repository.NewUserRepository(dbConn, sqlc.New(dbConn))
+	adapter := auth.NewUserRepositoryAdapter(repo)
+
+	id := uuid.NewString()
+	_, err := repo.CreateUser(ctx, repository.User{
+		ID:              id,
+		FullName:        "Temp Carrier",
+		Email:           "tempfields@example.com",
+		PasswordHash:    "permanent-hash",
+		NationalTeamIDs: []string{seededBrasilID},
+	})
+	require.NoError(t, err)
+
+	tempHash := "temp-bcrypt-hash"
+	expiresAt := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+	require.NoError(t, adapter.SetTempPassword(ctx, id, tempHash, expiresAt))
+
+	got, err := adapter.GetUserByID(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, tempHash, got.TempPasswordHash)
+	require.WithinDuration(t, expiresAt, got.TempPasswordExpiresAt, 0)
+}
+
+// CT-W4 — full stack-real round trip: a temp password written through the
+// adapter over a real migrated SQLite DB is visible on the service.User read
+// back via GetUserByEmail. This is the regression guard for §6.2: omitting the
+// temp-field copy in the adapter would silently zero these fields and the Login
+// temp branch (T6) would never see the temporary password.
+func TestAdapter_StackReal_TempVisivelNoService(t *testing.T) {
+	ctx := context.Background()
+	dbConn := testutil.TestNewDB(t)
+	repo := repository.NewUserRepository(dbConn, sqlc.New(dbConn))
+	adapter := auth.NewUserRepositoryAdapter(repo)
+
+	const userEmail = "stackreal@example.com"
+	id := uuid.NewString()
+	require.NoError(t, adapter.CreateUser(ctx, service.User{
+		ID:              id,
+		FullName:        "Stack Real",
+		Email:           userEmail,
+		PasswordHash:    "permanent-hash",
+		NationalTeamIDs: []string{seededBrasilID},
+	}))
+
+	tempHash := "stackreal-temp-hash"
+	expiresAt := time.Date(2026, 6, 1, 11, 30, 0, 0, time.UTC)
+	require.NoError(t, adapter.SetTempPassword(ctx, id, tempHash, expiresAt))
+
+	got, err := adapter.GetUserByEmail(ctx, userEmail)
+	require.NoError(t, err)
+	require.Equal(t, tempHash, got.TempPasswordHash)
+	require.WithinDuration(t, expiresAt, got.TempPasswordExpiresAt, 0)
+}
+
+// CT-W4-err (§6.4) — SetTempPassword on an unknown id translates the
+// repository's not-found sentinel into service.ErrUserNotFound at the adapter's
+// single translation point. Compared with errors.Is, never by substring.
+func TestAdapter_SetTempPassword_UnknownID_TranslatesSentinel(t *testing.T) {
+	ctx := context.Background()
+	dbConn := testutil.TestNewDB(t)
+	repo := repository.NewUserRepository(dbConn, sqlc.New(dbConn))
+	adapter := auth.NewUserRepositoryAdapter(repo)
+
+	err := adapter.SetTempPassword(ctx, uuid.NewString(), "h", time.Now())
+	require.ErrorIs(t, err, service.ErrUserNotFound)
 }
 
 // fixedClock is a deterministic Clock for the wiring tests.

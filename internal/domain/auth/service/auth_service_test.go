@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -31,14 +32,25 @@ const (
 // --- Manual mocks ---------------------------------------------------------
 
 type userRepoMock struct {
-	getByEmailFn func(ctx context.Context, email string) (service.User, error)
-	getByIDFn    func(ctx context.Context, id string) (service.User, error)
-	createFn     func(ctx context.Context, u service.User) error
+	getByEmailFn      func(ctx context.Context, email string) (service.User, error)
+	getByIDFn         func(ctx context.Context, id string) (service.User, error)
+	createFn          func(ctx context.Context, u service.User) error
+	setTempPasswordFn func(ctx context.Context, id, hash string, expiresAt time.Time) error
+	updatePasswordFn  func(ctx context.Context, id, hash string) error
 
 	createdUser   service.User
 	createCalled  bool
 	getEmailCalls []string
 	getIDCalls    []string
+
+	setTempCalled    bool
+	setTempID        string
+	setTempHash      string
+	setTempExpiresAt time.Time
+
+	updateCalled bool
+	updateID     string
+	updateHash   string
 }
 
 func (m *userRepoMock) GetUserByEmail(ctx context.Context, email string) (service.User, error) {
@@ -58,6 +70,44 @@ func (m *userRepoMock) CreateUser(ctx context.Context, u service.User) error {
 		return m.createFn(ctx, u)
 	}
 	return nil
+}
+
+func (m *userRepoMock) SetTempPassword(ctx context.Context, id, hash string, expiresAt time.Time) error {
+	m.setTempCalled = true
+	m.setTempID = id
+	m.setTempHash = hash
+	m.setTempExpiresAt = expiresAt
+	if m.setTempPasswordFn != nil {
+		return m.setTempPasswordFn(ctx, id, hash, expiresAt)
+	}
+	return nil
+}
+
+func (m *userRepoMock) UpdatePassword(ctx context.Context, id, hash string) error {
+	m.updateCalled = true
+	m.updateID = id
+	m.updateHash = hash
+	if m.updatePasswordFn != nil {
+		return m.updatePasswordFn(ctx, id, hash)
+	}
+	return nil
+}
+
+type emailSenderMock struct {
+	err error
+
+	sendCalled bool
+	toArg      string
+	subjectArg string
+	bodyArg    string
+}
+
+func (m *emailSenderMock) Send(_ context.Context, to, subject, body string) error {
+	m.sendCalled = true
+	m.toArg = to
+	m.subjectArg = subject
+	m.bodyArg = body
+	return m.err
 }
 
 type nationalTeamRepoMock struct {
@@ -110,7 +160,7 @@ func newService(
 	tokens service.TokenManager,
 ) *service.AuthService {
 	t.Helper()
-	svc, err := service.NewAuthService(users, teams, tokens, fixedClock{now: time.Now()}, testCost)
+	svc, err := service.NewAuthService(users, teams, tokens, &emailSenderMock{}, fixedClock{now: time.Now()}, zap.NewNop(), testCost)
 	require.NoError(t, err)
 	return svc
 }
@@ -501,6 +551,7 @@ func TestLogin_Success_JWT_TTL1h(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, testToken, res.AccessToken)
 	require.True(t, res.ExpiresAt.Equal(expectedExp), "expires_at must be the issuer's exp (now+1h)")
+	require.False(t, res.PasswordChangeRequired, "a plain login without recovery must not require a password change")
 	// Token was issued for the user resolved from the repository, not for the
 	// raw input e-mail.
 	require.Equal(t, testUserID, tokens.generatedFor)
@@ -589,4 +640,401 @@ func wrongPasswordMessage(t *testing.T) string {
 	_, err := svc.Login(context.Background(), testEmail, "definitely-wrong")
 	st, _ := status.FromError(err)
 	return st.Message()
+}
+
+// loginNow is the fixed clock instant used by the temporary-password login
+// tests, so expiration boundaries are deterministic.
+var loginNow = time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+
+// newLoginService builds an AuthService at loginNow for the temp-password login
+// tests, wiring a TokenManager that issues testToken at now+1h.
+func newLoginService(t *testing.T, user service.User) (*service.AuthService, *tokenManagerMock) {
+	t.Helper()
+	users := &userRepoMock{
+		getByEmailFn: func(context.Context, string) (service.User, error) { return user, nil },
+	}
+	tokens := &tokenManagerMock{
+		generateFn: func(string) (string, time.Time, error) { return testToken, loginNow.Add(time.Hour), nil },
+	}
+	svc, err := service.NewAuthService(users, teamFound(), tokens, &emailSenderMock{}, fixedClock{now: loginNow}, zap.NewNop(), testCost)
+	require.NoError(t, err)
+	return svc, tokens
+}
+
+const tempPassword = "TempXxx-RECOVERY-9!"
+
+// CT-006: when the permanent password matches, access is granted with
+// PasswordChangeRequired=false even though a non-expired temporary password is
+// active — the permanent password is checked first (CA-10/RN10).
+func TestLogin_SenhaOriginal_ComTempValida_False(t *testing.T) {
+	user := service.User{
+		ID:                    testUserID,
+		Email:                 testEmail,
+		PasswordHash:          hashOf(t, testPassword),
+		TempPasswordHash:      hashOf(t, tempPassword),
+		TempPasswordExpiresAt: loginNow.Add(5 * time.Minute),
+	}
+	svc, tokens := newLoginService(t, user)
+
+	res, err := svc.Login(context.Background(), testEmail, testPassword)
+
+	require.NoError(t, err)
+	require.Equal(t, testToken, res.AccessToken)
+	require.False(t, res.PasswordChangeRequired, "the permanent password must grant normal access despite an active temp password")
+	require.Equal(t, testUserID, tokens.generatedFor)
+}
+
+// CT-007: an active, non-expired temporary password grants access and signals
+// PasswordChangeRequired=true (CA-04).
+func TestLogin_SenhaTemporariaValida_True(t *testing.T) {
+	user := service.User{
+		ID:                    testUserID,
+		Email:                 testEmail,
+		PasswordHash:          hashOf(t, testPassword),
+		TempPasswordHash:      hashOf(t, tempPassword),
+		TempPasswordExpiresAt: loginNow.Add(10 * time.Minute),
+	}
+	svc, tokens := newLoginService(t, user)
+
+	res, err := svc.Login(context.Background(), testEmail, tempPassword)
+
+	require.NoError(t, err)
+	require.Equal(t, testToken, res.AccessToken)
+	require.True(t, res.PasswordChangeRequired, "an active temp password must require a password change")
+	require.Equal(t, testUserID, tokens.generatedFor)
+}
+
+// CT-008: an expired temporary password (expires_at = now-1s) is rejected with
+// the generic Unauthenticated message and issues no token (CA-05).
+func TestLogin_TempExpirada_Unauthenticated(t *testing.T) {
+	user := service.User{
+		ID:                    testUserID,
+		Email:                 testEmail,
+		PasswordHash:          hashOf(t, testPassword),
+		TempPasswordHash:      hashOf(t, tempPassword),
+		TempPasswordExpiresAt: loginNow.Add(-time.Second),
+	}
+	svc, tokens := newLoginService(t, user)
+
+	_, err := svc.Login(context.Background(), testEmail, tempPassword)
+
+	st, _ := status.FromError(err)
+	require.Equal(t, codes.Unauthenticated, st.Code())
+	require.Equal(t, wrongPasswordMessage(t), st.Message())
+	require.Empty(t, tokens.generatedFor, "no token must be issued for an expired temp password")
+}
+
+// CT-009: the expiration boundary is exclusive — expires_at == clock.Now() is
+// treated as expired (Before, not Before||Equal), so a temp password whose
+// expiration is exactly now is rejected (CA-05).
+func TestLogin_FronteiraExpiracaoExata_Negado(t *testing.T) {
+	user := service.User{
+		ID:                    testUserID,
+		Email:                 testEmail,
+		PasswordHash:          hashOf(t, testPassword),
+		TempPasswordHash:      hashOf(t, tempPassword),
+		TempPasswordExpiresAt: loginNow, // expires_at == clock.Now()
+	}
+	svc, tokens := newLoginService(t, user)
+
+	_, err := svc.Login(context.Background(), testEmail, tempPassword)
+
+	require.Equal(t, codes.Unauthenticated, status.Code(err),
+		"expires_at == now must be denied (boundary is exclusive)")
+	require.Empty(t, tokens.generatedFor)
+}
+
+// CT-010: the permanent password grants normal access with
+// PasswordChangeRequired=false even when the temporary password has already
+// expired (CA-10).
+func TestLogin_SenhaOriginal_TempExpirada_False(t *testing.T) {
+	user := service.User{
+		ID:                    testUserID,
+		Email:                 testEmail,
+		PasswordHash:          hashOf(t, testPassword),
+		TempPasswordHash:      hashOf(t, tempPassword),
+		TempPasswordExpiresAt: loginNow.Add(-time.Hour),
+	}
+	svc, tokens := newLoginService(t, user)
+
+	res, err := svc.Login(context.Background(), testEmail, testPassword)
+
+	require.NoError(t, err)
+	require.Equal(t, testToken, res.AccessToken)
+	require.False(t, res.PasswordChangeRequired)
+	require.Equal(t, testUserID, tokens.generatedFor)
+}
+
+// CT-017 (task T6): a user with no pending recovery logs in normally with
+// PasswordChangeRequired=false (CA-08).
+func TestLogin_SemRecovery_False(t *testing.T) {
+	user := service.User{
+		ID:           testUserID,
+		Email:        testEmail,
+		PasswordHash: hashOf(t, testPassword),
+		// TempPasswordHash empty, TempPasswordExpiresAt zero.
+	}
+	svc, tokens := newLoginService(t, user)
+
+	res, err := svc.Login(context.Background(), testEmail, testPassword)
+
+	require.NoError(t, err)
+	require.Equal(t, testToken, res.AccessToken)
+	require.False(t, res.PasswordChangeRequired)
+	require.Equal(t, testUserID, tokens.generatedFor)
+}
+
+// --- Password recovery ----------------------------------------------------
+
+const knownTempPassword = "TempPass-KNOWN-1!"
+
+// newRecoveryService builds an AuthService with an injected fixed clock, email
+// sender and temp-password generator, returning all three so tests can assert
+// the side-effects. The generator is overridden to a known value via the seam.
+func newRecoveryService(
+	t *testing.T,
+	users service.UserRepository,
+	email *emailSenderMock,
+	now time.Time,
+	tempPassword string,
+) *service.AuthService {
+	t.Helper()
+	svc, err := service.NewAuthService(users, teamFound(), &tokenManagerMock{}, email, fixedClock{now: now}, zap.NewNop(), testCost)
+	require.NoError(t, err)
+	svc.SetGenTempPassword(func() (string, error) { return tempPassword, nil })
+	return svc
+}
+
+// CT-001: a registered e-mail persists a bcrypt-valid hash of the (known)
+// temporary password with expires_at = now+15min and sends exactly one e-mail.
+// The stored hash is verified by re-deriving against the known plain password,
+// not by trusting any mock-planted value.
+func TestProcessRecovery_EmailCadastrado_PersisteEEnvia(t *testing.T) {
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	users := &userRepoMock{
+		getByEmailFn: func(context.Context, string) (service.User, error) {
+			return service.User{ID: testUserID, Email: testEmail}, nil
+		},
+	}
+	email := &emailSenderMock{}
+	svc := newRecoveryService(t, users, email, now, knownTempPassword)
+
+	err := svc.ProcessRecovery(context.Background(), testEmail)
+
+	require.NoError(t, err)
+	require.True(t, users.setTempCalled, "SetTempPassword must be called")
+	require.Equal(t, testUserID, users.setTempID)
+	require.NoError(t,
+		bcrypt.CompareHashAndPassword([]byte(users.setTempHash), []byte(knownTempPassword)),
+		"persisted hash must be a valid bcrypt hash of the temporary password")
+	require.True(t, users.setTempExpiresAt.Equal(now.Add(15*time.Minute)),
+		"expires_at must be clock.Now()+15min")
+	require.True(t, email.sendCalled, "exactly one e-mail must be sent")
+	require.Equal(t, testEmail, email.toArg)
+	require.NotContains(t, email.subjectArg, knownTempPassword, "subject must not carry the password")
+}
+
+// CT-002: an unknown e-mail produces total silence — no persistence, no e-mail,
+// and a nil error (anti-enumeration, CA-02).
+func TestProcessRecovery_EmailNaoCadastrado_Silencio(t *testing.T) {
+	users := &userRepoMock{
+		getByEmailFn: func(context.Context, string) (service.User, error) {
+			return service.User{}, service.ErrUserNotFound
+		},
+	}
+	email := &emailSenderMock{}
+	svc := newRecoveryService(t, users, email, time.Now(), knownTempPassword)
+
+	err := svc.ProcessRecovery(context.Background(), "ghost@example.com")
+
+	require.NoError(t, err)
+	require.False(t, users.setTempCalled, "must not persist a temp password for an unknown e-mail")
+	require.False(t, email.sendCalled, "must not send an e-mail for an unknown e-mail")
+}
+
+// CT-003: a delivery failure is best-effort — the temp password is already
+// persisted, processRecovery still returns nil and the flow is unchanged
+// (RN4/CA-03). The error is logged without the password (verified by routing
+// through a nop logger; no password leaves the body argument).
+func TestProcessRecovery_FalhaEnvio_BestEffort(t *testing.T) {
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	users := &userRepoMock{
+		getByEmailFn: func(context.Context, string) (service.User, error) {
+			return service.User{ID: testUserID, Email: testEmail}, nil
+		},
+	}
+	email := &emailSenderMock{err: errors.New("resend timeout")}
+	svc := newRecoveryService(t, users, email, now, knownTempPassword)
+
+	err := svc.ProcessRecovery(context.Background(), testEmail)
+
+	require.NoError(t, err, "delivery failure must not surface as an error")
+	require.True(t, users.setTempCalled, "temp password must remain persisted despite send failure")
+	require.NoError(t,
+		bcrypt.CompareHashAndPassword([]byte(users.setTempHash), []byte(knownTempPassword)),
+		"persisted hash must be valid even when delivery fails")
+	require.True(t, email.sendCalled, "delivery must have been attempted")
+}
+
+// --- ChangePassword -------------------------------------------------------
+
+// changeNow is the fixed instant used by the ChangePassword unit tests so the
+// expiration boundary is deterministic.
+var changeNow = time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+
+const (
+	changeTempPassword = "TempXxx-RECOVERY-9!"
+	changeNewPassword  = "NovaSenha@2026!"
+)
+
+// newChangeService builds an AuthService at changeNow whose GetUserByID returns
+// the given user, exposing the email mock so tests can assert the notification
+// side-effects. The bcrypt comparator is the real one (MinCost), so temp
+// validation is exercised end-to-end rather than mock-driven.
+func newChangeService(t *testing.T, user service.User, email *emailSenderMock) (*service.AuthService, *userRepoMock) {
+	t.Helper()
+	users := &userRepoMock{
+		getByIDFn: func(context.Context, string) (service.User, error) { return user, nil },
+	}
+	svc, err := service.NewAuthService(users, teamFound(), &tokenManagerMock{}, email, fixedClock{now: changeNow}, zap.NewNop(), testCost)
+	require.NoError(t, err)
+	return svc, users
+}
+
+// activeTempUser returns a user carrying an active (non-expired) temporary
+// password whose plain value is changeTempPassword.
+func activeTempUser(t *testing.T) service.User {
+	t.Helper()
+	return service.User{
+		ID:                    testUserID,
+		Email:                 testEmail,
+		PasswordHash:          hashOf(t, testPassword),
+		TempPasswordHash:      hashOf(t, changeTempPassword),
+		TempPasswordExpiresAt: changeNow.Add(10 * time.Minute),
+	}
+}
+
+// CT-011: a correct, non-expired temporary password persists the new password
+// via UpdatePassword. The stored hash is verified by re-deriving against the new
+// plain password (not a mock-planted value), proving the temp was invalidated in
+// the same operation (UpdatePassword clears the temp columns).
+func TestChangePassword_TempValida_PersisteEInvalida(t *testing.T) {
+	svc, users := newChangeService(t, activeTempUser(t), &emailSenderMock{})
+
+	err := svc.ChangePassword(context.Background(), testUserID, changeTempPassword, changeNewPassword)
+
+	require.NoError(t, err)
+	require.True(t, users.updateCalled, "UpdatePassword must be called exactly once")
+	require.Equal(t, testUserID, users.updateID, "must update the user identified by the token sub")
+	require.NoError(t,
+		bcrypt.CompareHashAndPassword([]byte(users.updateHash), []byte(changeNewPassword)),
+		"persisted hash must be a valid bcrypt hash of the new password")
+	require.NotEqual(t, changeNewPassword, users.updateHash, "new password must not be stored in plaintext")
+}
+
+// CT-012: an incorrect temporary password is rejected with InvalidArgument and
+// nothing is persisted.
+func TestChangePassword_TempIncorreta_InvalidArgument(t *testing.T) {
+	svc, users := newChangeService(t, activeTempUser(t), &emailSenderMock{})
+
+	err := svc.ChangePassword(context.Background(), testUserID, "SenhaErrada!", changeNewPassword)
+
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+	require.False(t, users.updateCalled, "must not persist when the temp password is wrong")
+}
+
+// CT-013: a correct but expired temporary password is rejected even though the
+// hash matches — the Before boundary treats expires_at <= now as expired.
+func TestChangePassword_TempExpirada_InvalidArgument(t *testing.T) {
+	user := activeTempUser(t)
+	user.TempPasswordExpiresAt = changeNow.Add(-time.Minute)
+	svc, users := newChangeService(t, user, &emailSenderMock{})
+
+	err := svc.ChangePassword(context.Background(), testUserID, changeTempPassword, changeNewPassword)
+
+	st, _ := status.FromError(err)
+	require.Equal(t, codes.InvalidArgument, st.Code())
+	require.Equal(t, "senha temporária inválida ou expirada", st.Message())
+	require.False(t, users.updateCalled, "must not persist when the temp password is expired")
+}
+
+// CT-014: a user with no active recovery (empty temp hash, zero expiration) is
+// rejected — ChangePassword only works post-recovery, never with the current
+// password.
+func TestChangePassword_SemTempAtiva_InvalidArgument(t *testing.T) {
+	user := service.User{
+		ID:           testUserID,
+		Email:        testEmail,
+		PasswordHash: hashOf(t, testPassword),
+		// TempPasswordHash empty, TempPasswordExpiresAt zero.
+	}
+	svc, users := newChangeService(t, user, &emailSenderMock{})
+
+	err := svc.ChangePassword(context.Background(), testUserID, "qualquer", changeNewPassword)
+
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+	require.False(t, users.updateCalled, "must not persist when no recovery is pending")
+}
+
+// CT-015: a successful change sends the notification e-mail after persisting,
+// addressed to the user, and the body carries no password.
+func TestChangePassword_DisparaNotificacao(t *testing.T) {
+	email := &emailSenderMock{}
+	svc, users := newChangeService(t, activeTempUser(t), email)
+
+	err := svc.ChangePassword(context.Background(), testUserID, changeTempPassword, changeNewPassword)
+
+	require.NoError(t, err)
+	require.True(t, users.updateCalled, "the change must be persisted")
+	require.True(t, email.sendCalled, "a notification e-mail must be sent after the change")
+	require.Equal(t, testEmail, email.toArg)
+	require.NotContains(t, email.bodyArg, changeNewPassword, "body must not carry the new password")
+	require.NotContains(t, email.bodyArg, changeTempPassword, "body must not carry the temp password")
+}
+
+// CT-016: a notification delivery failure is best-effort — UpdatePassword ran
+// before Send, so the change stays persisted and ChangePassword returns nil.
+func TestChangePassword_FalhaNotificacao_TrocaEfetivada(t *testing.T) {
+	email := &emailSenderMock{err: errors.New("smtp timeout")}
+	svc, users := newChangeService(t, activeTempUser(t), email)
+
+	err := svc.ChangePassword(context.Background(), testUserID, changeTempPassword, changeNewPassword)
+
+	require.NoError(t, err, "a delivery failure must not surface as an error")
+	require.True(t, users.updateCalled, "the change must be persisted before the e-mail is attempted")
+	require.NoError(t,
+		bcrypt.CompareHashAndPassword([]byte(users.updateHash), []byte(changeNewPassword)),
+		"the persisted hash must remain valid despite the delivery failure")
+	require.True(t, email.sendCalled, "delivery must have been attempted")
+}
+
+// CT-036: neither the temporary password nor the new password may appear in the
+// notification subject or body.
+func TestChangePassword_NotificacaoNaoVazaSenha(t *testing.T) {
+	email := &emailSenderMock{}
+	svc, _ := newChangeService(t, activeTempUser(t), email)
+
+	err := svc.ChangePassword(context.Background(), testUserID, changeTempPassword, changeNewPassword)
+
+	require.NoError(t, err)
+	require.True(t, email.sendCalled)
+	require.NotContains(t, email.subjectArg, changeTempPassword, "subject must not carry the temp password")
+	require.NotContains(t, email.subjectArg, changeNewPassword, "subject must not carry the new password")
+	require.NotContains(t, email.bodyArg, changeTempPassword, "body must not carry the temp password")
+	require.NotContains(t, email.bodyArg, changeNewPassword, "body must not carry the new password")
+}
+
+// CT-037: the production crypto/rand generator yields distinct strings of the
+// expected length on successive calls (no overridden seam).
+func TestGenTempPassword_CryptoRand_Unicidade(t *testing.T) {
+	const minLength = 12
+
+	first, err := service.GenerateTempPassword()
+	require.NoError(t, err)
+	second, err := service.GenerateTempPassword()
+	require.NoError(t, err)
+
+	require.GreaterOrEqual(t, len(first), minLength, "generated password must meet the minimum length")
+	require.GreaterOrEqual(t, len(second), minLength)
+	require.NotEqual(t, first, second, "successive generations must differ")
 }

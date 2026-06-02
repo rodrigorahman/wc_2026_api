@@ -1,8 +1,8 @@
 // bufconn.go provides TestNewBufconnServer: an in-process gRPC server wired with
 // the *real* production interceptor chain (recovery → logging → protovalidate →
 // auth JWT) and the real db/auth/nationalteam fx modules, reachable over an
-// in-memory bufconn listener. E2E tests (CT-027..032) dial the returned
-// connection and exercise the full stack black-box.
+// in-memory bufconn listener. E2E tests dial the returned connection and
+// exercise the full stack black-box.
 package testutil
 
 import (
@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/rodrigorahman/wc_2026_api/internal/domain/auth"
+	"github.com/rodrigorahman/wc_2026_api/internal/domain/auth/service"
 	"github.com/rodrigorahman/wc_2026_api/internal/domain/match"
 	"github.com/rodrigorahman/wc_2026_api/internal/infra/clock"
 	"github.com/rodrigorahman/wc_2026_api/internal/infra/config"
@@ -48,15 +49,58 @@ func (c *FixedClock) Now() time.Time { return c.now }
 // Advance moves the clock forward by d.
 func (c *FixedClock) Advance(d time.Duration) { c.now = c.now.Add(d) }
 
+// SentEmail holds the arguments of a single EmailSender.Send call captured by
+// CapturingEmailSender.
+type SentEmail struct {
+	To      string
+	Subject string
+	Body    string
+}
+
+// CapturingEmailSender is a test-only EmailSender that records every Send call
+// and signals a buffered channel so callers can synchronize with background
+// goroutines (e.g. the goroutine launched by RequestPasswordRecovery) without
+// sleeping. It never returns an error.
+//
+// Receive at most one email per test scenario:
+//
+//	select {
+//	case mail := <-sender.Received:
+//	    // use mail.Body
+//	case <-ctx.Done():
+//	    t.Fatal("timed out waiting for email")
+//	}
+type CapturingEmailSender struct {
+	// Received is a buffered channel (capacity 8) that receives every sent email.
+	Received chan SentEmail
+}
+
+// NewCapturingEmailSender returns a ready-to-use CapturingEmailSender.
+func NewCapturingEmailSender() *CapturingEmailSender {
+	return &CapturingEmailSender{Received: make(chan SentEmail, 8)}
+}
+
+// Send captures to/subject/body and never fails.
+func (s *CapturingEmailSender) Send(_ context.Context, to, subject, body string) error {
+	s.Received <- SentEmail{To: to, Subject: subject, Body: body}
+	return nil
+}
+
+// Compile-time assertion that CapturingEmailSender satisfies service.EmailSender.
+var _ service.EmailSender = (*CapturingEmailSender)(nil)
+
 // TestNewBufconnServer starts the full gRPC server (real interceptor chain, real
 // modules) over an in-memory bufconn listener and returns a connected
 // *grpc.ClientConn. The optional clk overrides the system clock so tests can
-// control token issuance/expiration; pass nil to use the system clock.
+// control token issuance/expiration; pass nil to use the system clock. The
+// optional emailSender overrides the production EmailSender via fx.Decorate so
+// tests can capture sent e-mails and synchronize with background goroutines;
+// pass nil to use the production sender selected by config (NoopSender in dev).
 //
 // The server is built around a fresh migrated SQLite database (seed applied) so
 // every test is isolated. Cleanup (stop server, close conn) is registered via
 // t.Cleanup.
-func TestNewBufconnServer(t *testing.T, clk clock.Clock) *grpc.ClientConn {
+func TestNewBufconnServer(t *testing.T, clk clock.Clock, emailSender service.EmailSender) *grpc.ClientConn {
 	t.Helper()
 
 	lis := bufconn.Listen(bufconnBufSize)
@@ -83,6 +127,10 @@ func TestNewBufconnServer(t *testing.T, clk clock.Clock) *grpc.ClientConn {
 	}
 	if clk != nil {
 		opts = append(opts, fx.Decorate(func(clock.Clock) clock.Clock { return clk }))
+	}
+	if emailSender != nil {
+		sender := emailSender
+		opts = append(opts, fx.Decorate(func(service.EmailSender) service.EmailSender { return sender }))
 	}
 
 	app := fx.New(opts...)

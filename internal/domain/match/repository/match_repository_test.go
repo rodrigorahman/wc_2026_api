@@ -113,7 +113,7 @@ func TestIntegration_MatchesTable_DownDrops(t *testing.T) {
 		Scan(&beforeDown))
 	require.Equal(t, 1, beforeDown, "matches must exist before down")
 
-	require.NoError(t, migrator.Steps(-2)) // -2: desfaz 000008 (seed Copa) e 000007 (cria matches)
+	require.NoError(t, migrator.Steps(-3)) // -3: desfaz 000009 (temp password), 000008 (seed Copa) e 000007 (cria matches)
 
 	var afterDown int
 	require.NoError(t, db.QueryRowContext(ctx,

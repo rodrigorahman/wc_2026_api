@@ -5,6 +5,7 @@
 package sqlc
 
 import (
+	"database/sql"
 	"time"
 )
 
@@ -26,11 +27,13 @@ type NationalTeam struct {
 }
 
 type User struct {
-	ID           string
-	FullName     string
-	Email        string
-	PasswordHash string
-	CreatedAt    time.Time
+	ID                    string
+	FullName              string
+	Email                 string
+	PasswordHash          string
+	CreatedAt             time.Time
+	TempPasswordHash      sql.NullString
+	TempPasswordExpiresAt sql.NullTime
 }
 
 type UserNationalTeam struct {

@@ -16,7 +16,7 @@ import (
 // the seed data is exercised end-to-end).
 func TestE2E_ListNationalTeams_Public(t *testing.T) {
 	ctx := context.Background()
-	conn := testutil.TestNewBufconnServer(t, nil)
+	conn := testutil.TestNewBufconnServer(t, nil, nil)
 	client := nationalteamv1.NewNationalTeamServiceClient(conn)
 
 	resp, err := client.ListNationalTeams(ctx, &nationalteamv1.ListNationalTeamsRequest{})
@@ -41,7 +41,7 @@ func TestE2E_ListNationalTeams_Public(t *testing.T) {
 // selections, and Brasil carries its exact flag URL.
 func TestE2E_ListNationalTeams_FlagURL(t *testing.T) {
 	ctx := context.Background()
-	conn := testutil.TestNewBufconnServer(t, nil)
+	conn := testutil.TestNewBufconnServer(t, nil, nil)
 	client := nationalteamv1.NewNationalTeamServiceClient(conn)
 
 	resp, err := client.ListNationalTeams(ctx, &nationalteamv1.ListNationalTeamsRequest{})
@@ -64,7 +64,7 @@ func TestE2E_ListNationalTeams_FlagURL(t *testing.T) {
 // ponta a ponta.
 func TestE2E_ListNationalTeams_NoEmptyFlagURL(t *testing.T) {
 	ctx := context.Background()
-	conn := testutil.TestNewBufconnServer(t, nil)
+	conn := testutil.TestNewBufconnServer(t, nil, nil)
 	client := nationalteamv1.NewNationalTeamServiceClient(conn)
 
 	resp, err := client.ListNationalTeams(ctx, &nationalteamv1.ListNationalTeamsRequest{})
@@ -90,7 +90,7 @@ type onlyListNationalTeams interface {
 // A asserção é estrutural: o client gerado satisfaz a interface restrita
 // (compile-time) e não implementa nenhuma interface com GetNationalTeamByID.
 func TestE2E_NationalTeamService_HasNoGetByIDRPC(t *testing.T) {
-	conn := testutil.TestNewBufconnServer(t, nil)
+	conn := testutil.TestNewBufconnServer(t, nil, nil)
 	client := nationalteamv1.NewNationalTeamServiceClient(conn)
 
 	// Compile-time + runtime: the generated client satisfies the restricted
